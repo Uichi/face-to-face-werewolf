@@ -18,7 +18,7 @@ const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
 const names = ['あなた', 'あおい', 'はる', 'みなと', 'ひなた'];
 const demoRoom = (): Room => ({ id: 'preview', code: 'A7C92F4B10', hostId: 'p0', viewerId: 'p0', status: 'waiting', revision: 1,
-  victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
+  loverRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
   members: names.map((nickname, i) => ({ id: `p${i}`, nickname, connected: true })) });
 function readSaved(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key: string, value: string | null) { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* The auth layer reports storage failures. */ } }
@@ -133,7 +133,10 @@ export default function App() {
     try {
       if (preview) setRoom({ ...room, composition: composition ?? { ...DEFAULT_COMPOSITIONS[room.members.length]! }, customComposition: composition !== null, discussionMinutes, victoryPoints, revision: room.revision + 1 });
       else {
-        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, composition, discussionMinutes, ...(victoryPoints ? { victoryPoints } : {}) });
+        // Older servers accept six roles; hide the new role until migration 011 is available.
+        const compPayload = composition && !room.loverRole ? Object.fromEntries(Object.entries(composition).filter(([role]) => role !== 'lover')) : composition;
+        const pointsPayload = victoryPoints && !room.loverRole ? Object.fromEntries(Object.entries(victoryPoints).filter(([role]) => role !== 'lover')) : victoryPoints;
+        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, composition: compPayload, discussionMinutes, ...(pointsPayload ? { victoryPoints: pointsPayload } : {}) });
         setRoom(current => current?.id === updated.id && current.revision <= updated.revision ? updated : current);
       }
       setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。');
@@ -234,12 +237,13 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   onResetPoints: () => Promise<void>;
   onSave: (composition: Composition | null, minutes: number, victoryPoints?: VictoryPoints) => Promise<void>; onNotice: (message: string) => void;
 }) {
-  const [pointsDraft, setPointsDraft] = useState<VictoryPoints>({ ...(room.victoryPoints ?? DEFAULT_VICTORY_POINTS) });
+  const [pointsDraft, setPointsDraft] = useState<VictoryPoints>({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints });
   const [qr, setQr] = useState('');
   const [editing, setEditing] = useState(false);
   const [minutes, setMinutes] = useState(room.discussionMinutes);
   const [custom, setCustom] = useState(room.customComposition);
-  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
+  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
+  const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => role !== 'lover' || room.loverRole);
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
   const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
@@ -249,9 +253,9 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   let pointsError = '';
   try { if (room.victoryPoints) validateVictoryPoints(pointsDraft); } catch (e) { pointsError = (e as Error).message; }
   let currentError = '';
-  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0 }); } catch (e) { currentError = (e as Error).message; }
+  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0 }); } catch (e) { currentError = (e as Error).message; }
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
-  useEffect(() => { setPointsDraft({ ...(room.victoryPoints ?? DEFAULT_VICTORY_POINTS) }); setEditing(false); setMinutes(room.discussionMinutes); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
+  useEffect(() => { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
   async function copy() {
     try { await navigator.clipboard.writeText(invite); onNotice(preview ? 'プレビュー用のリンクをコピーしました。' : '招待リンクをコピーしました。'); }
     catch { onNotice('リンクを長押ししてコピーしてください。'); }
@@ -265,15 +269,16 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       </div></section>
       <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '閉じる' : '設定を変更'}</button>}</div>
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
-        <div className="role-grid">{(Object.keys(roleNames) as Role[]).map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
+        <div className="role-grid">{availableRoles.map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦', '♡'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
+        {room.loverRole && (room.composition?.lover ?? 0) > 0 && <p className="inline-note">恋人は村側の2人組です。片方が脱落すると、もう片方も後追いで脱落します。</p>}
         {!room.composition && <p className="small-note">5人集まると、おすすめの配役が表示されます。</p>}
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}
         {currentError && <p role="alert" className="field-error">参加人数が変わりました。配役を設定し直してください。</p>}
         {editing && isHost && <form className="settings-form" onSubmit={e => { e.preventDefault(); void onSave(custom ? draft : null, minutes, room.victoryPoints ? pointsDraft : undefined); }}>
           <label>議論時間<select value={minutes} onChange={e => setMinutes(Number(e.target.value))}>{Array.from({ length: 10 }, (_, i) => <option value={i + 1} key={i}>{i + 1}分</option>)}</select></label>
           <label className="check-label"><input type="checkbox" checked={custom} onChange={e => setCustom(e.target.checked)}/>配役を自分で決める</label>
-          {custom && <div className="role-inputs">{(Object.keys(roleNames) as Role[]).map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : 1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/></label>)}</div>}
-          {room.victoryPoints && <fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{(Object.keys(roleNames) as Role[]).map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset>}
+          {custom && <div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}{role === 'lover' ? <select aria-label="恋人の人数" value={draft.lover} onChange={e => setDraft({ ...draft, lover: Number(e.target.value) })}><option value={0}>0人</option><option value={2}>2人</option></select> : <input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : 1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/>}</label>)}</div>}
+          {room.victoryPoints && <fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset>}
           {pointsError && <p className="field-error" role="alert">{pointsError}</p>}
           {settingError && <p className="field-error" role="alert">{settingError}</p>}
           <button className="primary" disabled={busy || Boolean(settingError) || Boolean(pointsError)}>設定を保存</button>

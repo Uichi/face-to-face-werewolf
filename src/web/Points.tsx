@@ -19,7 +19,7 @@ export function Scoreboard({ room, scores }: { room: Room; scores?: Score[] | nu
 export function ScoringRules({ points }: { points: VictoryPoints }) {
   return <details className="scoring-rules"><summary>ポイントのルール・配点を見る</summary>
     <p>勝利点＋生存点＋貢献点を、試合終了時に加算します。</p>
-    <dl className="victory-points">{(Object.keys(roleNames) as Role[]).map(role => <div key={role}><dt>{roleNames[role]}</dt><dd>勝利で{points[role]}点</dd></div>)}</dl>
+    <dl className="victory-points">{(Object.keys(roleNames) as Role[]).filter(role => points[role] !== undefined).map(role => <div key={role}><dt>{roleNames[role]}</dt><dd>勝利で{points[role]}点</dd></div>)}</dl>
     <p><b>生存点：</b>初日を除き、夜を越えるたび＋1点（最大3点）。負けても獲得できます。</p>
     <p><b>貢献点：</b>次の成功ごとに＋1点（合計最大3点）。勝った陣営だけが獲得できます。</p>
     <ul><li>村側：処刑された人狼に投票。</li><li>人狼・狂人：処刑された村側に投票。</li><li>占い師：占いで人狼を発見。同じ人狼は1回だけ。</li><li>騎士：護衛で襲撃を防ぐ。連続護衛も対象。</li></ul>

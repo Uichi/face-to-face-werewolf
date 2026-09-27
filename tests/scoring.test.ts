@@ -16,7 +16,7 @@ function votes(target:string):Game {
  const g=base();g.phase='vote';g.selections=Object.fromEntries(g.players.map(p=>[p.id,p.id===target?'v0':target]));return g;
 }
 
-test('勝利点は6役職の整数0〜10、勝利陣営の脱落者も対象、敗北は生存点のみ',()=>{
+test('勝利点は7役職の整数0〜10、勝利陣営の脱落者も対象、敗北は生存点のみ',()=>{
  validateVictoryPoints({...DEFAULT_VICTORY_POINTS});
  for(const value of [-1,11,1.5,NaN]) assert.throws(()=>validateVictoryPoints({...DEFAULT_VICTORY_POINTS,wolf:value}));
  const g=base();for(const p of g.players){p.alive=false;recordPoint(g.scoring,p.id,'survival');recordPoint(g.scoring,p.id,'contribution');}

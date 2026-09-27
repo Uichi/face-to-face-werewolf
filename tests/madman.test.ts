@@ -18,5 +18,5 @@ test('狂人は初夜の白候補になり、占い・霊媒で白と出て、�
 });
 test('標準配役の狂人は8人以上で1人、カスタムでも0〜1人',()=>{
  for(let n=5;n<=13;n++)assert.equal(DEFAULT_COMPOSITIONS[n]!.madman,n>=8?1:0);
- assert.throws(()=>validateComposition(8,{villager:1,wolf:2,seer:1,medium:1,knight:1,madman:2}));
+ assert.throws(()=>validateComposition(8,{villager:1,wolf:2,seer:1,medium:1,knight:1,madman:2, lover: 0}));
 });

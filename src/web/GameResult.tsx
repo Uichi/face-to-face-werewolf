@@ -22,6 +22,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
     {ending && <div className="final-event" id="final-event">
       <div className="section-number">最後の出来事 · {ending.day}日目{ending.cause === 'attack' ? 'の夜' : ''}</div>
       <p className="final-person"><strong>{name(ending.playerId)}</strong>さんが<br/>{verb}</p>
+      {ending.followedIds?.map(id=><p key={id} className="final-followed"><strong>{name(id)}</strong>さんも後追いで脱落しました。</p>)}
       {lastPlayer?.role && <span className="final-role">役職：{roleNames[lastPlayer.role]}</span>}
     </div>}
     <div className="victory-summary">
@@ -32,7 +33,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
       <p className="your-result">{selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
     </div>
     <div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
-    <div className="result-roles"><h3>全員の役職</h3>{game.players.map(p => <div key={p.id} className={p.id === ending?.playerId ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? roleNames[p.role] : ''}</strong><small>{p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>)}</div>
+    <div className="result-roles"><h3>全員の役職</h3>{game.players.map(p => <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? roleNames[p.role] : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>)}</div>
     {game.scores && <Scoreboard room={room} scores={game.scores}/>}
     {children}
   </section>;

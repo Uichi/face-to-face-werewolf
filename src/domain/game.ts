@@ -5,7 +5,7 @@ import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
 import type { VictoryPoints, Scoring, Score } from './scoring.ts';
 
-export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number };
+export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number; followedIds?: string[] };
 export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'finished';
 type Secret = { recipientId: string; targetId: string; isWolf: boolean; kind: 'initial' | 'seer' | 'medium'; day: number };
 type Action =
@@ -107,7 +107,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
         }
         const death = eliminate(game.players, result.executedId, 'execution');
         game.players = death.players;
-        game.lastElimination = { playerId: result.executedId, cause: 'execution', day: game.day };
+        game.lastElimination = { playerId: result.executedId, cause: 'execution', day: game.day, ...(death.followedIds.length ? { followedIds: death.followedIds } : {}) };
         if (death.mediumResult) game.secrets.push({
           recipientId: death.mediumResult.mediumId, targetId: result.executedId,
           isWolf: death.mediumResult.isWolf, kind: 'medium', day: game.day,
@@ -130,7 +130,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     game.players = result.players;
     for (const p of alive(game)) recordPoint(game.scoring, p.id, 'survival');
     game.victimId = result.victimId;
-    if (result.victimId) game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day };
+    if (result.victimId) game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day, ...(result.followedIds.length ? { followedIds: result.followedIds } : {}) };
     if (result.divination) game.secrets.push({
       recipientId: result.divination.seerId, targetId: result.divination.targetId,
       isWolf: result.divination.isWolf, kind: 'seer', day: game.day,
@@ -203,8 +203,8 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
       case 'remove': {
         const death = eliminate(game.players, action.targetId, 'disconnect');
         game.players = death.players;
-        game.lastElimination = { playerId: action.targetId, cause: 'disconnect', day: game.day };
-        game.removals.push({ playerId: action.targetId, day: game.day });
+        game.lastElimination = { playerId: action.targetId, cause: 'disconnect', day: game.day, ...(death.followedIds.length ? { followedIds: death.followedIds } : {}) };
+        game.removals.push(...[action.targetId, ...death.followedIds].map(playerId => ({ playerId, day: game.day })));
         if (!finishIfWon(game, now)) {
           if (['vote', 'runoff', 'night'].includes(game.phase)) {
             const phase = game.phase === 'night' ? 'night' : 'vote';
@@ -237,17 +237,18 @@ export function viewFor(game: Game, viewerId: string) {
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role } : {}) })),
-    composition: Object.fromEntries(['villager', 'wolf', 'seer', 'medium', 'knight', 'madman'].map(role => [role, game.players.filter(p => p.role === role).length])),
+    composition: Object.fromEntries(['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover'].map(role => [role, game.players.filter(p => p.role === role).length])),
     completedCount: game.confirmed.filter(id => alive(game).some(p => p.id === id)).length,
     requiredCount: alive(game).length,
     runoffIds: [...game.runoffIds], voteResult: structuredClone(game.voteResult), victimId: game.victimId,
     removals: structuredClone(game.removals),
+    followedIds: (game.phase === 'execution' && game.voteResult?.executedId === game.lastElimination?.playerId && game.lastElimination?.cause === 'execution') || (game.phase === 'morning' && game.victimId && game.lastElimination?.cause === 'attack') ? [...(game.lastElimination?.followedIds ?? [])] : [],
     ending: isFinished ? structuredClone(game.lastElimination ?? null) : null,
   };
   if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null };
   return {
     public: publicInfo,
-    private: { role: viewer.role, confirmed: game.confirmed.includes(viewerId),
+    private: { role: viewer.role, loverId: viewer.role === 'lover' ? game.players.find(p => p.role === 'lover' && p.id !== viewerId)?.id ?? null : null, confirmed: game.confirmed.includes(viewerId),
       selection: Object.hasOwn(game.selections, viewerId) ? game.selections[viewerId] : null,
       results: structuredClone(game.secrets.filter(s => s.recipientId === viewerId)),
     },

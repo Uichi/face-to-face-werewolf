@@ -4,7 +4,8 @@ export type Member = { id: string; nickname: string; connected: boolean; points?
 export type Room = {
   id: string; code: string; hostId: string; viewerId: string; status: 'waiting' | 'playing' | 'finished';
   revision: number; discussionMinutes: number; composition: Composition | null;
+  loverRole?: boolean;
   victoryPoints?: VictoryPoints;
   customComposition: boolean; members: Member[];
 };
-export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人' } as const;
+export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人', lover: '恋人' } as const;

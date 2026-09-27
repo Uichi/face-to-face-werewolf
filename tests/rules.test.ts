@@ -21,13 +21,13 @@ test('5〜13人の標準配役を検証し、過不足なく配布する', () =>
 
 test('人数範囲・合計・人狼数・能力職上限・小数の不正を拒否する', () => {
   for (const [count, composition] of [
-    [14, { villager: 8, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 0 }],
-    [4, { villager: 2, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0 }],
+    [14, { villager: 8, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 0, lover: 0 }],
+    [4, { villager: 2, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0 }],
     [5, { ...DEFAULT_COMPOSITIONS[5]!, villager: 4 }],
-    [5, { villager: 4, wolf: 0, seer: 1, medium: 0, knight: 0, madman: 0 }],
-    [6, { villager: 3, wolf: 3, seer: 0, medium: 0, knight: 0, madman: 0 }],
-    [5, { villager: 2, wolf: 1, seer: 2, medium: 0, knight: 0, madman: 0 }],
-    [5, { villager: 2.5, wolf: 1.5, seer: 1, medium: 0, knight: 0, madman: 0 }],
+    [5, { villager: 4, wolf: 0, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0 }],
+    [6, { villager: 3, wolf: 3, seer: 0, medium: 0, knight: 0, madman: 0, lover: 0 }],
+    [5, { villager: 2, wolf: 1, seer: 2, medium: 0, knight: 0, madman: 0, lover: 0 }],
+    [5, { villager: 2.5, wolf: 1.5, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0 }],
   ] as const) assert.throws(() => validateComposition(count, composition));
 });
 
