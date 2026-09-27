@@ -63,18 +63,21 @@ export default function App() {
     if (new URLSearchParams(location.search).has('preview')) { setPreview(true); setRoom(demoRoom()); }
   }, []);
 
-  const resume = useCallback(async (id: string) => {
+  const resume = useCallback(async (id: string, automatic = false) => {
     if (operation.current) return;
     operation.current = true; setBusy(true); setError('');
     try {
       if (!await hasSession()) throw new Error('このブラウザの参加情報が見つかりません。招待コードから参加してください。');
       const restored = await lobby('heartbeat', { roomId: id });
-      setPreview(false); setRoom(restored);
+      setPreview(false);
+      if (automatic && restored.status === 'finished') {
+        setRoom(null); setScreen('home'); setNotice('前の試合は終了しています。新しい部屋をつくるか、招待された部屋に参加してください。');
+      } else { setRoom(restored); setNotice(''); }
     } catch (e) { if (e instanceof RoomAccessLostError) clearSavedRoom(id); setError((e as Error).message); }
     finally { setBusy(false); operation.current = false; }
   }, [clearSavedRoom]);
   useEffect(() => {
-    if (configured && savedRoom && !inviteCode() && !new URLSearchParams(location.search).has('preview')) void resume(savedRoom);
+    if (configured && savedRoom && !inviteCode() && !new URLSearchParams(location.search).has('preview')) void resume(savedRoom, true);
     // The mount restore must not run again after a user chooses another screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume]);
@@ -180,12 +183,12 @@ export default function App() {
       {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
-      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom}/> : <>
+      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom} onHome={home}/> : <>
         {screen === 'home' ? <div className="home-grid">
           <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜10人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
-            <button className="action-card" onClick={() => { setScreen('create'); setError(''); }}><span className="action-icon">＋</span><span><strong>部屋をつくる</strong><small>主催者になって、みんなを招待</small></span><span className="arrow">↗</span></button>
-            <button className="action-card secondary-card" onClick={() => { setScreen('join'); setError(''); }}><span className="action-icon">⌗</span><span><strong>部屋に参加する</strong><small>招待された部屋のコードを入力</small></span><span className="arrow">→</span></button>
+            <button className="action-card" disabled={busy} onClick={() => { setScreen('create'); setError(''); }}><span className="action-icon">＋</span><span><strong>部屋をつくる</strong><small>主催者になって、みんなを招待</small></span><span className="arrow">↗</span></button>
+            <button className="action-card secondary-card" disabled={busy} onClick={() => { setScreen('join'); setError(''); }}><span className="action-icon">⌗</span><span><strong>部屋に参加する</strong><small>招待された部屋のコードを入力</small></span><span className="arrow">→</span></button>
             {savedRoom && <div className="saved-room-actions">{configured && <button className="resume" disabled={busy} onClick={() => void resume(savedRoom)}>前の部屋に戻る →</button>}<button className="text-button" disabled={busy} onClick={forgetHistory}>部屋の履歴を消す</button></div>}
             {!configured && <div className="preview-note"><span className="dot"/>現在は画面確認版です。<button className="text-button" onClick={() => { setPreview(true); setRoom(demoRoom()); setError(''); }}>待機室をプレビュー →</button></div>}
             <div className="how"><div><b>1</b><span>仲間を招待</span></div><i/><div><b>2</b><span>役職を確認</span></div><i/><div><b>3</b><span>会話で推理</span></div></div>
