@@ -49,3 +49,11 @@ export function watchRoom(roomId: string, refresh: () => void) {
     .subscribe(status => { if (status === 'SUBSCRIBED') refresh(); });
   return () => { void client!.removeChannel(channel); };
 }
+
+export async function resetPoints(payload: Record<string, unknown>): Promise<Room> {
+  if (!client) throw new Error('接続先が設定されていません。');
+  const { data, error } = await client.rpc('score_command', { action: 'reset', payload });
+  if (error) throw new Error(error.code === 'P0001' ? error.message : '通信を確認して、もう一度お試しください。');
+  if (!data?.ok) throw new Error('ポイントをリセットできませんでした。');
+  return data.room as Room;
+}

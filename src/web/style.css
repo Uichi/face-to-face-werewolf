@@ -22,3 +22,24 @@
 .role-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.role-inputs{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:700px){.role-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 .current-task{padding:22px 26px;border:1px solid #b9c9a6;border-left:5px solid #5c7748;border-radius:6px;background:#eaf0df}.current-task>span{font-size:12px;letter-spacing:.12em;font-weight:600;color:#53683e}.current-task h2{font-size:22px;line-height:1.6;margin:8px 0;color:#29452e}.game-screen .current-task p{margin:0;font-size:14px;line-height:1.8}.task-waiting{background:#eeefe9;border-color:#d2d6c9;border-left-color:#929c87}.task-waiting h2{color:#5d6955}.result-confirm{padding-top:10px}.game-screen .result-confirm p{font-size:14px}.night-task{padding:12px;background:#eaf0df;border-radius:4px}@media(max-width:700px){.current-task{padding:18px}.current-task h2{font-size:20px}}
+
+/* Room scores stay compact on phone screens; no per-action details are displayed. */
+.scoreboard h3 { margin: 0 0 16px; font-size: 1.05rem; }
+.score-row { padding: 14px 0; border-bottom: 1px solid #dedfd4; }
+.score-person { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.score-person > strong { flex: 1; min-width: 90px; overflow-wrap: anywhere; }
+.score-rank { color: #637268; font-size: .85rem; }
+.score-total { white-space: nowrap; font-size: .85rem; }
+.score-total b { font-size: 1.35rem; color: #284b3e; }
+.score-breakdown { display: flex; gap: 8px 14px; flex-wrap: wrap; font-size: .82rem; margin: 10px 0 0; color: #56665b; }
+.score-breakdown strong { margin-left: auto; color: #284b3e; }
+.scoring-rules { margin-top: 20px; font-size: .85rem; line-height: 1.8; }
+.scoring-rules summary { cursor: pointer; font-weight: 700; }
+.scoring-rules ul { padding-left: 22px; }
+.victory-points { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px 16px; }
+.victory-points > div { display: flex; justify-content: space-between; gap: 8px; }
+.victory-points dd { margin: 0; }
+.points-inputs { border: 0; padding: 0; margin: 20px 0; min-width: 0; }
+.points-inputs legend { font-weight: 700; }
+.reset-points { margin-top: 20px; }
+.result-panel .scoreboard { margin-top: 24px; text-align: left; }

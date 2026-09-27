@@ -1,6 +1,9 @@
 // Trusted server state. Clients must receive viewFor(), never Game directly.
-import { assignRoles, eliminate, getWinner, initialWhite, resolveNight, resolveVote } from './rules.ts';
+import { assignRoles, eliminate, getWinner, initialWhite, resolveNight, resolveVote, teamOf } from './rules.ts';
 import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules.ts';
+
+import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
+import type { VictoryPoints, Scoring, Score } from './scoring.ts';
 
 export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number };
 export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'finished';
@@ -26,6 +29,7 @@ export type Game = {
   day: number; discussionMs: number; deadline: number | null; lastTime: number;
   selections: Record<string, string>; confirmed: string[]; runoffIds: string[];
   voteResult: VoteResult | null; victimId: string | null; winner: Team | null;
+  scoring?: Scoring; scores?: Score[];
   lastElimination?: Elimination | null;
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
@@ -50,23 +54,28 @@ function enter(game: Game, phase: Phase, now: number): void {
 
 function finishIfWon(game: Game, now: number): boolean {
   game.winner = getWinner(game.players);
-  if (game.winner) enter(game, 'finished', now);
+  if (game.winner) {
+    if (game.scoring) game.scores = calculateScores(game.scoring, game.players, game.winner);
+    enter(game, 'finished', now);
+  }
   return game.winner !== null;
 }
 
 export function createGame(input: {
-  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number;
+  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints;
 }, now: number, random: RandomIndex): Game {
   const minutes = input.discussionMinutes ?? 3;
   check(input.id.length > 0 && input.playerIds.includes(input.hostId), '試合・主催者が不正です');
   check(Number.isInteger(minutes) && minutes >= 1 && minutes <= 10, '議論時間は1〜10分です');
   check(Number.isSafeInteger(now) && now >= 0, 'サーバー時刻が不正です');
+  const victoryPoints = { ...(input.victoryPoints ?? DEFAULT_VICTORY_POINTS) };
+  validateVictoryPoints(victoryPoints);
   const players = assignRoles(input.playerIds, input.composition, random);
   return {
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
     selections: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
-    winner: null, secrets: [], removals: [], receipts: {},
+    scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], receipts: {},
   };
 }
 
@@ -92,6 +101,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       game.runoffIds = [...result.runoffIds];
     } else {
       if (result.executedId) {
+        const target = game.players.find(p => p.id === result.executedId)!;
+        for (const p of alive(game)) {
+          if (game.selections[p.id] === target.id && (teamOf(p.role) === 'village' ? target.role === 'wolf' : teamOf(target.role) === 'village')) recordPoint(game.scoring, p.id, 'contribution');
+        }
         const death = eliminate(game.players, result.executedId, 'execution');
         game.players = death.players;
         game.lastElimination = { playerId: result.executedId, cause: 'execution', day: game.day };
@@ -112,7 +125,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       divination: seer ? actionOf(seer) : null,
       protection: knight ? actionOf(knight) : null,
     }, random);
+    if (result.divination?.isWolf) recordPoint(game.scoring, result.divination.seerId, 'contribution', result.divination.targetId);
+    if (knight && result.victimId === null) recordPoint(game.scoring, knight.id, 'contribution');
     game.players = result.players;
+    for (const p of alive(game)) recordPoint(game.scoring, p.id, 'survival');
     game.victimId = result.victimId;
     if (result.victimId) game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day };
     if (result.divination) game.secrets.push({
@@ -217,6 +233,7 @@ export function viewFor(game: Game, viewerId: string) {
   const canSeePrivate = viewer.alive && !isFinished;
   const publicInfo = {
     resultConfirmation: true,
+    scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role } : {}) })),

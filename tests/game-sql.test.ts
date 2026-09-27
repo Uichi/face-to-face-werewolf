@@ -16,7 +16,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql','202609280010_points.sql','202609280010_points.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  async function user(id:string) { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec('set role authenticated'); }
  async function raw(name:string, action:string, payload:Record<string,unknown>) {
   const result=await db.query<{data:Response}>(`select public.${name}($1,$2::jsonb) data`,[action,JSON.stringify(payload)]);return result.rows[0]!.data;
@@ -145,7 +145,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    await f.call(f.host,'remove',{targetId:missing.id});assert.equal((await f.state()).phase,'night');
   });
   await t.test('旧段階・二重送信・他人の操作・直接の秘密データ取得を検証',async()=>{
-   const f=await setup(5);const g=await f.state();const target=g.players[1]!.id;
+   const f=await setup(5);const g=await f.state();const target=g.players.find(p=>p.id!==f.host && p.role!=='wolf')!.id;
    await user(f.users[0]!);
    const cmd={roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID()};
    const first=await raw('game_command','confirm',cmd);const second=await raw('game_command','confirm',cmd);
@@ -220,6 +220,86 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    expected=applyCommand(g,{gameId:g.id,phaseId:g.phaseId,requestId:'ref2',actorId:null,action:{type:'tick'}},60000,()=>0);
    actual=await settle(g);assert.deepEqual(actual.players,expected.players);assert.deepEqual(actual.secrets,expected.secrets);assert.equal(actual.victimId,'s');
    const view=(await db.query<{v:View}>('select app_private.game_view($1::jsonb,$2) v',[JSON.stringify(actual),'s'])).rows[0]!.v;assert.equal(view.private,null);
+  });
+  await t.test('採点: 勝敗確定・再送・再接続・再戦で一度だけ累計、非公開実績を返さない',async()=>{
+   const f=await setup(8);let g=await f.state();
+   assert.deepEqual(g.scoring!.victoryPoints,{villager:5,wolf:6,seer:5,medium:5,knight:5,madman:6});
+   for(const p of g.players){const v=await f.call(p.id,'get');assert.equal(v.game!.public.scores,null);assert.ok(!JSON.stringify(v).includes('discovered'));assert.ok(!JSON.stringify(v).includes('"stats"'));assert.ok(v.room.members.every(m=>m.points===0));}
+   const wolves=g.players.filter(p=>p.role==='wolf');
+   const dead=g.players.find(p=>p.role==='villager')!;
+   await f.call(f.host,'remove',{targetId:dead.id});
+   await f.call(f.host,'remove',{targetId:wolves[0]!.id});
+   g=await f.state();g.phase='vote';g.selections=Object.fromEntries(g.players.filter(p=>p.alive).map(p=>[p.id,p.id===wolves[1]!.id?g.players.find(x=>x.alive && x.id!==p.id)!.id:wolves[1]!.id]));
+   const last=g.players.find(p=>p.alive)!;g.confirmed=g.players.filter(p=>p.alive&&p.id!==last.id).map(p=>p.id);
+   await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);
+   const command={roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID()};await user(f.memberUsers.get(last.id)!);
+   const first=await raw('game_command','confirm',command);assert.equal(first.game!.public.phase,'finished');
+   const scores=first.game!.public.scores!;assert.equal(scores.length,8);
+   for(const p of g.players){const s=scores.find(s=>s.playerId===p.id)!;const win=!['wolf','madman'].includes(p.role);assert.equal(s.victory,win?5:0);assert.equal(s.contribution,win&&p.alive?1:0);assert.equal(s.survival,0);assert.equal(first.room.members.find(m=>m.id===p.id)!.points,s.total);}
+   const retry=await raw('game_command','confirm',command);assert.deepEqual(retry.game,first.game);assert.deepEqual(retry.room.members,first.room.members);
+   await user(f.memberUsers.get(f.host)!);const read=await raw('game_command','get',{roomId:f.roomId});assert.deepEqual(read.room.members,first.room.members);
+   const waiting=await f.call(f.host,'rematch');assert.deepEqual(waiting.room.members,first.room.members);
+   const start=await raw('game_command','start',{roomId:f.roomId,revision:waiting.room.revision,requestId:randomUUID()});assert.equal(start.game!.public.scores,null);assert.deepEqual(start.room.members,first.room.members);
+  });
+  await t.test('採点: 設定の検証・権限・配点確定・累計リセット・退出と再参加',async()=>{
+   const f=await setup(5);const g=await f.state();const wolf=g.players.find(p=>p.role==='wolf')!;
+   await user(f.users[0]!);await assert.rejects(raw('score_command','reset',{roomId:f.roomId,revision:f.response.room.revision}));
+   assert.equal((await raw('lobby_command','settings',{roomId:f.roomId,revision:f.response.room.revision,discussionMinutes:3,composition:null,victoryPoints:{}})).ok,false);
+   await f.call(f.host,'remove',{targetId:wolf.id});let waiting=await f.call(f.host,'rematch');
+   const other=waiting.room.members.find(m=>m.id!==f.host)!;
+   await user(f.memberUsers.get(other.id)!);await assert.rejects(raw('score_command','reset',{roomId:f.roomId,revision:waiting.room.revision}));
+   assert.equal((await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{}})).ok,false);
+   await user(f.users[0]!);
+   const points={villager:0,wolf:10,seer:3,medium:4,knight:2,madman:8};
+   for(const value of [-1,11,1.5,'2',null])await assert.rejects(raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{...points,wolf:value}}));
+   await assert.rejects(raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{...points,extra:1}}));
+   let updated=await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:points});assert.equal(updated.ok,true);assert.deepEqual(updated.room.victoryPoints,points);
+   assert.equal(updated.room.members.reduce((n,m)=>n+m.points!,0),20);
+   const staleRevision=waiting.room.revision;await assert.rejects(raw('score_command','reset',{roomId:f.roomId,revision:staleRevision}));
+   const resetCommand={roomId:f.roomId,revision:updated.room.revision};updated=await raw('score_command','reset',resetCommand);assert.ok(updated.room.members.every(m=>m.points===0));assert.deepEqual(updated.room.victoryPoints,points);
+   await assert.rejects(raw('score_command','reset',resetCommand));
+   // Old clients that omit victoryPoints must preserve the new setting.
+   updated=await raw('lobby_command','settings',{roomId:f.roomId,revision:updated.room.revision,discussionMinutes:4,composition:null});assert.deepEqual(updated.room.victoryPoints,points);
+   await raw('game_command','start',{roomId:f.roomId,revision:updated.room.revision,requestId:randomUUID()});let next=await f.state();assert.deepEqual(next.scoring!.victoryPoints,points);
+   await f.call(f.host,'remove',{targetId:next.players.find(p=>p.role==='wolf')!.id});waiting=await f.call(f.host,'rematch');
+   const scoresBefore=waiting.room.members.find(m=>m.id===other.id)!.points;
+   await user(f.memberUsers.get(other.id)!);await raw('membership_command','leave',{roomId:f.roomId,memberId:other.id,revision:waiting.room.revision});
+   const joined=await raw('lobby_command','join',{code:waiting.room.code,nickname:other.nickname});const rejoined=joined.room.members.find(m=>m.nickname===other.nickname)!;assert.notEqual(rejoined.id,other.id);assert.equal(rejoined.points,0);assert.ok(scoresBefore!>=0);
+   // Internal award/reset state is not directly accessible to authenticated users.
+   await assert.rejects(db.query('select points from app_private.members'));
+   await assert.rejects(db.query("select app_private.score_award($1,'{}')",[f.roomId]));
+  });
+  await t.test('採点: SQLとドメインで決選・占い重複・護衛・最終夜・退場の実績が一致',async()=>{
+   const f=await setup(8);const original=await f.state();
+   const id=(role:string,index=0)=>original.players.filter(p=>p.role===role)[index]!.id;
+   const [w0,w1,s,k,v0,v1,c]=[id('wolf'),id('wolf',1),id('seer'),id('knight'),id('villager'),id('villager',1),id('madman')];
+   async function settle(g:Game){
+    g.lastTime=0;
+    g.confirmed=g.players.filter(p=>p.alive).map(p=>p.id);
+    const expected=applyCommand(g,{gameId:g.id,phaseId:g.phaseId,requestId:randomUUID(),actorId:null,action:{type:'tick'}},Date.now(),()=>0);
+    await db.exec('reset role');const actual=(await db.query<{g:Game}>('select app_private.game_settle($1::jsonb,$2::bigint) g',[JSON.stringify(g),Date.now()])).rows[0]!.g;
+    assert.deepEqual(actual.scoring,expected.scoring);assert.equal(actual.winner,expected.winner);return actual;
+   }
+   let g=structuredClone(original);g=await settle(g);g=await settle(g);assert.deepEqual(g.scoring!.stats,{});
+   for(let n=0;n<5;n++){g.phase='night';g.selections={[w0]:v0,[w1]:v0,[s]:w0,[k]:v0};g=await settle(g);}
+   assert.equal(g.scoring!.stats[s]!.contribution,1);assert.equal(g.scoring!.stats[k]!.contribution,3);assert.ok(Object.values(g.scoring!.stats).every(s=>s.survival===3));
+   // Tie then tied runoff: neither awards any ballot points.
+   g=structuredClone(original);g.phase='vote';g.selections=Object.fromEntries(g.players.map((p,i)=>[p.id,p.id===w0?v0:p.id===v0?w0:i<4?w0:v0]));
+   const others=g.players.filter(p=>![w0,v0].includes(p.id));g.selections={[w0]:v0,[v0]:w0,...Object.fromEntries(others.map((p,i)=>[p.id,i<3?w0:v0]))};
+   const ballots={...g.selections};g=await settle(g);assert.equal(g.phase,'runoff');assert.deepEqual(g.scoring!.stats,{});g.selections=ballots;g=await settle(g);assert.equal(g.voteResult!.executedId,null);assert.deepEqual(g.scoring!.stats,{});
+   // Final night counts surviving players, but not the seer being attacked.
+   g=structuredClone(original);g.phase='night';g.players=g.players.map(p=>({...p,alive:[w0,w1,s,v0,v1].includes(p.id)}));g.selections={[w0]:s,[w1]:s,[s]:w0};g=await settle(g);
+   assert.equal(g.winner,'wolves');assert.equal(g.scoring!.stats[s]!.contribution,1);assert.equal(g.scoring!.stats[s]!.survival,0);assert.equal(g.scoring!.stats[w0]!.survival,1);
+   const award=(await db.query<{g:Game}>('select app_private.score_award($1,$2::jsonb) g',[f.roomId,JSON.stringify(g)])).rows[0]!.g;
+   assert.equal(award.scores!.find(p=>p.playerId===s)!.total,0);assert.equal(award.scores!.find(p=>p.playerId===c)!.victory,6);
+   // SQL view only exposes aggregate finished scores, never counters or discovered targets.
+   const view=(await db.query<{v:View}>('select app_private.game_view($1::jsonb,$2) v',[JSON.stringify(award),v0])).rows[0]!.v;
+   assert.deepEqual(view.public.scores,award.scores);assert.ok(!JSON.stringify(view).includes('discovered'));
+  });
+  await t.test('採点: 更新前の試合へ遡及せず、旧試合でも最後まで進行可能',async()=>{
+   const f=await setup(5);const g=await f.state();delete g.scoring;
+   await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);
+   const finished=await f.call(f.host,'remove',{targetId:g.players.find(p=>p.role==='wolf')!.id});assert.equal(finished.game!.public.phase,'finished');assert.equal(finished.game!.public.scores,null);assert.ok(finished.room.members.every(m=>m.points===0));
   });
  }finally{await db.close();}
 });

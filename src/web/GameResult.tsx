@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { GameView } from './game-api.ts';
 import type { Room } from './types.ts';
 import { teamOf } from '../domain/rules.ts';
+import { Scoreboard } from './Points.tsx';
 import { roleNames } from './types.ts';
 
 export default function GameResult({ game, room, children }: { game: GameView['public']; room: Room; children: ReactNode }) {
@@ -32,6 +33,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
     </div>
     <div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
     <div className="result-roles"><h3>全員の役職</h3>{game.players.map(p => <div key={p.id} className={p.id === ending?.playerId ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? roleNames[p.role] : ''}</strong><small>{p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>)}</div>
+    {game.scores && <Scoreboard room={room} scores={game.scores}/>}
     {children}
   </section>;
 }
