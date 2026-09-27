@@ -1,5 +1,5 @@
 // Server-only rules. Never serialize this module's full input state to clients.
-export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight';
+export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman';
 export type Team = 'village' | 'wolves';
 export type Composition = Record<Role, number>;
 export type Player = { id: string; role: Role; alive: boolean };
@@ -7,17 +7,17 @@ export type Choice = { actorId: string; targetId: string };
 // Production callers must supply a cryptographically secure uniform integer source.
 export type RandomIndex = (exclusiveMax: number) => number;
 
-const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight'];
+const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman'];
 export const DEFAULT_COMPOSITIONS: Readonly<Record<number, Readonly<Composition>>> = Object.freeze({
-  5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0 }),
-  6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0 }),
-  7: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 1 }),
-  8: Object.freeze({ villager: 3, wolf: 2, seer: 1, medium: 1, knight: 1 }),
-  9: Object.freeze({ villager: 4, wolf: 2, seer: 1, medium: 1, knight: 1 }),
-  10: Object.freeze({ villager: 5, wolf: 2, seer: 1, medium: 1, knight: 1 }),
-  11: Object.freeze({ villager: 6, wolf: 2, seer: 1, medium: 1, knight: 1 }),
-  12: Object.freeze({ villager: 6, wolf: 3, seer: 1, medium: 1, knight: 1 }),
-  13: Object.freeze({ villager: 7, wolf: 3, seer: 1, medium: 1, knight: 1 }),
+  5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0 }),
+  6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0, madman: 0 }),
+  7: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 1, madman: 0 }),
+  8: Object.freeze({ villager: 2, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1 }),
+  9: Object.freeze({ villager: 3, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1 }),
+  10: Object.freeze({ villager: 4, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1 }),
+  11: Object.freeze({ villager: 5, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1 }),
+  12: Object.freeze({ villager: 5, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1 }),
+  13: Object.freeze({ villager: 6, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1 }),
 });
 
 function requireRule(condition: unknown, message: string): asserts condition {
@@ -35,8 +35,8 @@ export function validateComposition(count: number, composition: Composition): vo
   requireRule(Number.isInteger(count) && count >= 5 && count <= 13, '参加人数は5〜13人です');
   requireRule(roles.every(role => Number.isInteger(composition[role]) && composition[role] >= 0), '配役は非負整数です');
   requireRule(roles.reduce((sum, role) => sum + composition[role], 0) === count, '配役合計が参加人数と一致しません');
-  requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、村側より少なくしてください');
-  requireRule(['seer', 'medium', 'knight'].every(role => composition[role as Role] <= 1), '能力職は各0〜1人です');
+  requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、人間（狂人を含む）より少なくしてください');
+  requireRule(['seer', 'medium', 'knight', 'madman'].every(role => composition[role as Role] <= 1), '占い師・霊媒師・騎士・狂人は各0〜1人です');
 }
 
 export function assignRoles(ids: readonly string[], composition: Composition, random: RandomIndex): Player[] {
@@ -49,6 +49,8 @@ export function assignRoles(ids: readonly string[], composition: Composition, ra
     return { id, role, alive: true };
   });
 }
+
+export function teamOf(role: Role): Team { return role === 'wolf' || role === 'madman' ? 'wolves' : 'village'; }
 
 export function getWinner(players: readonly Player[]): Team | null {
   const alive = players.filter(p => p.alive);

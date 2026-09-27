@@ -10,7 +10,7 @@ test('参加者整理: 権限・再参加・再送・主催者退出・試合中
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for(const file of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270007_thirteen_players.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270007_thirteen_players.sql','202609280008_madman.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  async function user(id:string|null){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id??'']);await db.exec('set role authenticated');}
  async function rpc(fn:string,action:string,payload:Record<string,unknown>){return (await db.query<{data:{ok:boolean;code?:string;room:Room;left?:boolean;game?:any}}>(`select public.${fn}($1,$2::jsonb) data`,[action,JSON.stringify(payload)])).rows[0]!.data;}
  async function setup(){

@@ -6,15 +6,17 @@ import type { GameResponse, GameView } from './game-api.ts';
 import { requestId } from './invite.ts';
 import { watchRoom } from './api.ts';
 import GameResult from './GameResult.tsx';
+import { teamOf } from '../domain/rules.ts';
 import type { Role } from '../domain/rules.ts';
 
 type Pending = { action: string; payload: Record<string, unknown> };
 const phaseNames = { roles: '役職を確認', firstNight: '最初の夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '投票の結果', night: '夜の行動', morning: '朝になりました', finished: '試合終了' };
 const roleDetails: Record<Role, string> = {
  villager: 'あなたは村側です。仲間と話し合い、人狼を見つけましょう。夜は確認だけ行います。',
- wolf: 'あなたは人狼側です。夜に村側の1人を選んで襲撃します。仲間と選択が分かれたときは、選ばれた人の中から無作為に決まります。',
+ wolf: 'あなたは人狼側です。夜に人狼以外の1人を選んで襲撃します。狂人を襲撃することもあります。仲間と選択が分かれたときは、選ばれた人の中から無作為に決まります。',
  seer: 'あなたは村側です。夜に自分以外の1人が人狼かどうかを調べられます。',
  medium: 'あなたは村側です。処刑された人が人狼かどうかを、処刑後に確認できます。',
+ madman: 'あなたは人狼側の人間です。会話で人狼を助けましょう。人狼が誰かは分からず、人狼にもあなたの正体は分かりません。占い・霊媒では人狼ではないと出ます。夜は確認だけ行います。人数判定では人間として数えます。',
  knight: 'あなたは村側です。夜に自分以外の1人を護衛します。同じ人を続けて護衛できます。',
 };
 
@@ -101,7 +103,7 @@ export default function GameScreen({ room, onRoom, onHome }: { room: Room; onRoo
    {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
    {!self.alive&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
    {phase==='finished'?<GameResult game={pub} room={room}>{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じメンバーで再戦</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
-     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<p className="muted">周りに画面を見せないように確認してください。</p>:<div className="secret-content"><span className="role-team">{role==='wolf'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
+     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<p className="muted">周りに画面を見せないように確認してください。</p>:<div className="secret-content"><span className="role-team">{teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
        {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p>{night&&game.wolves.selections.map(s=><p key={s.actorId}>{name(s.actorId)}：{s.targetId?name(s.targetId):'未選択'}</p>)}</div>}
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
        {night&&canSelect&&<><h3>{role==='wolf'?'襲撃する人':role==='seer'?'占う人':'護衛する人'}を選ぶ</h3>{selector}</>}

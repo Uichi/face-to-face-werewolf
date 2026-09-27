@@ -16,7 +16,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609270007_thirteen_players.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280008_madman.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  async function user(id:string) { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec('set role authenticated'); }
  async function raw(name:string, action:string, payload:Record<string,unknown>) {
   const result=await db.query<{data:Response}>(`select public.${name}($1,$2::jsonb) data`,[action,JSON.stringify(payload)]);return result.rows[0]!.data;
@@ -83,11 +83,42 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    const f=await setup(13);const original=await f.state();
    for(const wolf of original.players.filter(p=>p.role==='wolf'))await f.call(f.host,'remove',{targetId:wolf.id});
    const waiting=await f.call(f.host,'rematch');await user(f.users[0]!);
-   const comp={villager:12,wolf:1,seer:0,medium:0,knight:0};
+   const comp={villager:12,wolf:1,seer:0,medium:0,knight: 0, madman: 0};
    const settings=await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:10,composition:comp});
    assert.equal(settings.ok,true);
    const started=await raw('game_command','start',{roomId:f.roomId,revision:settings.room.revision,requestId:randomUUID()});
    assert.equal(started.ok,true);assert.equal(started.game!.public.players.length,13);assert.deepEqual(started.game!.public.composition,comp);
+  });
+  await t.test('狂人に仲間情報・夜の能力を渡さず、白判定・襲撃・共通確認を処理する',async()=>{
+   const f=await setup(8),base=await f.state();
+   const madman=base.players.find(p=>p.role==='madman')!,seer=base.players.find(p=>p.role==='seer')!;
+   const view=(await f.call(madman.id,'get')).game!;assert.equal(view.private!.role,'madman');assert.equal(view.wolves,null);assert.equal(view.public.composition.madman,1);
+   for(const wolf of base.players.filter(p=>p.role==='wolf'))assert.equal((await f.call(wolf.id,'get')).game!.wolves!.memberIds.includes(madman.id),false);
+   await f.allConfirm();await f.allConfirm();let g=await f.state();
+   g={...g,phase:'night',phaseId:g.phaseId+1,deadline:Date.now()+60000,confirmed:[],selections:{}};
+   await db.exec('reset role');await db.query('update app_private.games set state=$1::jsonb where room_id=$2',[JSON.stringify(g),f.roomId]);
+   await assert.rejects(f.call(madman.id,'select',{targetId:seer.id}));
+   const guardTarget=g.players.find(p=>p.role==='villager')!;
+   for(const p of g.players){if(['wolf','seer','knight'].includes(p.role))await f.call(p.id,'select',{targetId:p.role==='knight'?guardTarget.id:madman.id});}
+   for(const p of g.players.filter(p=>p.id!==madman.id))await f.call(p.id,'confirm');
+   assert.equal((await f.state()).phase,'night');await f.call(madman.id,'confirm');
+   assert.equal((await f.state()).victimId,madman.id);
+   assert.equal((await f.call(seer.id,'get')).game!.private!.results.at(-1)!.isWolf,false);
+   await db.exec('reset role');const killed=(await db.query<{g:Game}>('select app_private.game_kill($1::jsonb,$2,$3) g',[JSON.stringify(base),madman.id,'execution'])).rows[0]!.g;
+   assert.equal(killed.secrets.at(-1)!.isWolf,false);
+   const counts={players:[base.players.find(p=>p.role==='wolf')!,madman,seer]};
+   assert.equal((await db.query<{winner:string|null}>('select app_private.game_winner($1::jsonb) winner',[JSON.stringify(counts)])).rows[0]!.winner,null);
+  });
+  await t.test('旧5役職のカスタム設定を狂人0として扱い、狂人2人は拒否する',async()=>{
+   const f=await setup(5),base=await f.state();await f.call(f.host,'remove',{targetId:base.players.find(p=>p.role==='wolf')!.id});
+   let response=await f.call(f.host,'rematch');await user(f.users[0]!);
+   const legacy={villager:3,wolf:1,seer:1,medium:0,knight:0};
+   response=await raw('lobby_command','settings',{roomId:f.roomId,revision:response.room.revision,discussionMinutes:3,composition:legacy});
+   assert.equal(response.ok,true);assert.equal(response.room.composition!.madman,0);
+   const invalid=await raw('lobby_command','settings',{roomId:f.roomId,revision:response.room.revision,discussionMinutes:3,composition:{villager:1,wolf:1,seer:1,medium:0,knight:0,madman:2}});assert.equal(invalid.ok,false);
+   await db.exec('reset role');await db.query('update app_private.rooms set composition=$1::jsonb where id=$2',[JSON.stringify(legacy),f.roomId]);
+   await user(f.users[0]!);const started=await raw('game_command','start',{roomId:f.roomId,revision:response.room.revision,requestId:randomUUID()});
+   assert.equal(started.game!.public.composition.madman,0);
   });
   await t.test('旧段階・二重送信・他人の操作・直接の秘密データ取得を検証',async()=>{
    const f=await setup(5);const g=await f.state();const target=g.players[1]!.id;

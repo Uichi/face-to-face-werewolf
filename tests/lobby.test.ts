@@ -16,7 +16,7 @@ test('待機室SQL: 認証・作成・参加・復帰・権限・人数・設定
   `);
   for (const id of ids) await db.query('insert into auth.users values($1)', [id]);
   await db.exec(await readFile(new URL('../supabase/migrations/202609250001_lobby.sql', import.meta.url), 'utf8'));
-  for (const file of ['202609270003_game.sql','202609270007_thirteen_players.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+  for (const file of ['202609270003_game.sql','202609270007_thirteen_players.sql','202609280008_madman.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   async function asUser(id: string | null) {
     await db.exec('reset role');
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [id ?? '']);

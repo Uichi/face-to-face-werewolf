@@ -8,7 +8,7 @@ function fixture(count = 5) {
   const ids = count === 5 ? ['v0', 'v1', 'v2', 'w', 's']
     : count === 7 ? ['v0', 'v1', 'v2', 'w', 's', 'm', 'k']
     : ['v0', 'v1', 'v2', 'w0', 'w1', 's', 'm', 'k'];
-  let game = createGame({ id: 'game-1', hostId: 'v0', playerIds: ids, composition: DEFAULT_COMPOSITIONS[count]! }, 0, () => 0);
+  let game = createGame({ id: 'game-1', hostId: 'v0', playerIds: ids, composition: count===8 ? {...DEFAULT_COMPOSITIONS[8]!,villager:3,madman:0} : DEFAULT_COMPOSITIONS[count]! }, 0, () => 0);
   let sequence = 0;
   let now = 0;
   const send = (actorId: string | null, action: Command['action']) => {

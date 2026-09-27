@@ -218,7 +218,7 @@ export function viewFor(game: Game, viewerId: string) {
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role } : {}) })),
-    composition: Object.fromEntries(['villager', 'wolf', 'seer', 'medium', 'knight'].map(role => [role, game.players.filter(p => p.role === role).length])),
+    composition: Object.fromEntries(['villager', 'wolf', 'seer', 'medium', 'knight', 'madman'].map(role => [role, game.players.filter(p => p.role === role).length])),
     completedCount: game.confirmed.filter(id => alive(game).some(p => p.id === id)).length,
     requiredCount: alive(game).length,
     runoffIds: [...game.runoffIds], voteResult: structuredClone(game.voteResult), victimId: game.victimId,

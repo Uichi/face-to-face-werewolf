@@ -221,7 +221,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [editing, setEditing] = useState(false);
   const [minutes, setMinutes] = useState(room.discussionMinutes);
   const [custom, setCustom] = useState(room.customComposition);
-  const [draft, setDraft] = useState<Composition>(room.composition ?? { ...DEFAULT_COMPOSITIONS[5]! });
+  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
   const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
@@ -229,9 +229,9 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   let settingError = '';
   try { if (custom) validateComposition(count, draft); } catch (e) { settingError = (e as Error).message; }
   let currentError = '';
-  try { if (room.composition) validateComposition(count, room.composition); } catch (e) { currentError = (e as Error).message; }
+  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0 }); } catch (e) { currentError = (e as Error).message; }
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
-  useEffect(() => { setEditing(false); setMinutes(room.discussionMinutes); setCustom(room.customComposition); setDraft(room.composition ?? { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
+  useEffect(() => { setEditing(false); setMinutes(room.discussionMinutes); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
   async function copy() {
     try { await navigator.clipboard.writeText(invite); onNotice(preview ? 'プレビュー用のリンクをコピーしました。' : '招待リンクをコピーしました。'); }
     catch { onNotice('リンクを長押ししてコピーしてください。'); }
@@ -245,7 +245,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       </div></section>
       <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '閉じる' : '設定を変更'}</button>}</div>
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
-        <div className="role-grid">{(Object.keys(roleNames) as Role[]).map((role, index) => <div key={role} className={role === 'wolf' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜'][index]}</span><span>{roleNames[role]}</span><b>{room.composition?.[role] ?? '—'}</b></div>)}</div>
+        <div className="role-grid">{(Object.keys(roleNames) as Role[]).map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
         {!room.composition && <p className="small-note">5人集まると、おすすめの配役が表示されます。</p>}
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}
         {currentError && <p role="alert" className="field-error">参加人数が変わりました。配役を設定し直してください。</p>}

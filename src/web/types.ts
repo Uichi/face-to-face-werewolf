@@ -5,4 +5,4 @@ export type Room = {
   revision: number; discussionMinutes: number; composition: Composition | null;
   customComposition: boolean; members: Member[];
 };
-export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士' } as const;
+export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人' } as const;

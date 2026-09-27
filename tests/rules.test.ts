@@ -21,13 +21,13 @@ test('5〜13人の標準配役を検証し、過不足なく配布する', () =>
 
 test('人数範囲・合計・人狼数・能力職上限・小数の不正を拒否する', () => {
   for (const [count, composition] of [
-    [14, { villager: 8, wolf: 3, seer: 1, medium: 1, knight: 1 }],
-    [4, { villager: 2, wolf: 1, seer: 1, medium: 0, knight: 0 }],
+    [14, { villager: 8, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 0 }],
+    [4, { villager: 2, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0 }],
     [5, { ...DEFAULT_COMPOSITIONS[5]!, villager: 4 }],
-    [5, { villager: 4, wolf: 0, seer: 1, medium: 0, knight: 0 }],
-    [6, { villager: 3, wolf: 3, seer: 0, medium: 0, knight: 0 }],
-    [5, { villager: 2, wolf: 1, seer: 2, medium: 0, knight: 0 }],
-    [5, { villager: 2.5, wolf: 1.5, seer: 1, medium: 0, knight: 0 }],
+    [5, { villager: 4, wolf: 0, seer: 1, medium: 0, knight: 0, madman: 0 }],
+    [6, { villager: 3, wolf: 3, seer: 0, medium: 0, knight: 0, madman: 0 }],
+    [5, { villager: 2, wolf: 1, seer: 2, medium: 0, knight: 0, madman: 0 }],
+    [5, { villager: 2.5, wolf: 1.5, seer: 1, medium: 0, knight: 0, madman: 0 }],
   ] as const) assert.throws(() => validateComposition(count, composition));
 });
 
@@ -36,7 +36,7 @@ test('重複IDと不正な乱数を拒否する', () => {
   assert.throws(() => assignRoles(['a', 'b', 'c', 'd', 'e'], DEFAULT_COMPOSITIONS[5]!, max => max));
 });
 
-test('初夜の白通知は自分以外の村側のみ、占い師不在なら通知なし', () => {
+test('初夜の白通知は自分以外の人狼以外のみ、占い師不在なら通知なし', () => {
   for (let index = 0; index < 3; index++) {
     const result = initialWhite(five(), () => index)!;
     assert.equal(result.seerId, '1');

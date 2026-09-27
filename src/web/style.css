@@ -18,3 +18,5 @@
 @media(max-width:700px){.game-screen .result-panel{padding:0}.final-event,.victory-summary{padding:24px 18px}.game-screen .victory-summary h2{font-size:36px}.victory-summary h2 span{font-size:24px}.game-screen .final-person{font-size:18px}.final-person strong{font-size:25px}.winning-members{padding:0 18px}.result-panel .result-roles{margin:24px 18px}.result-panel>.primary{width:calc(100% - 36px);margin:0 18px 22px}.result-panel>.muted{padding:0 18px 16px}}
 
 .result-exit{margin:0 28px 28px;text-align:center}.result-exit .secondary-button{width:100%}.game-screen .result-exit p{font-size:13px;color:#758076;margin:10px 0 0}@media(max-width:700px){.result-exit{margin:0 18px 22px}}
+
+.role-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.role-inputs{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:700px){.role-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
