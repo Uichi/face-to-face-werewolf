@@ -4,7 +4,9 @@
 
 ## 現在の状態
 
-仕様書、ゲームルール、進行処理に加え、Reactのトップ・部屋作成・コード参加・待機室を作成しました。Supabase用の保存処理と接続コードもありますが、実際のプロジェクトは未作成・未接続です。ゲーム開始以降の画面・通信接続と公開環境はまだありません。
+公開サイトの招待・参加は接続済みです。役職確認、初夜、議論、投票・決選、夜の能力、結果、途中脱落、再戦の画面とSupabaseの処理を追加しました。
+
+ゲーム機能を使うには、既存のSupabaseプロジェクトへ [ゲーム用SQLの追加](docs/game-setup.md) が必要です。追加後に実環境での試合とスマホの操作を確認します。ローカル自動テストは51件通過しています。
 
 - [確定仕様](docs/spec.md)
 - [開発手順](docs/roadmap.md)
@@ -14,7 +16,7 @@
 - `tests/game.test.ts`: 進行と異常系の自動検証
 - [サーバー接続時の契約](docs/engine.md)
 - `src/web/`: スマホ向け画面、匿名認証、QR招待、待機室の更新・復帰
-- `supabase/migrations/`: 部屋・参加者・設定・閲覧制限・主催者移行
+- `supabase/migrations/`: 部屋・参加者・設定・閲覧制限・主催者移行・ゲーム進行
 - `tests/lobby.test.ts`: PGliteでのSQLと権限の検証
 - [Supabaseの設定手順](docs/supabase-setup.md)
 
@@ -34,9 +36,9 @@ Node.js 24で`npm ci`、続いて`npm run dev`を実行します。接続先が�
 
 `npm run typecheck`で型検査、`npm test`でゲーム処理・部屋のSQL・権限制限を検証します。Supabaseの実環境とスマホの実機での検証は、接続設定後に行います。
 
-## 構成予定
+## 構成
 
-React + TypeScript / Supabase（匿名認証、データベース、リアルタイム配信）。ホスティングの初期候補はCloudflare Pagesです。利用条件・料金は公開前に確認します。
+React + TypeScript / Supabase（匿名認証、データベース、リアルタイム配信）。静的画面はSitesで公開しています。
 
 今回の公開にはSitesの静的ホスティングを使用します。`.openai/hosting.json`が公開先を識別します。公開ビルドでは`VITE_INVITE_BASE_URL`を空にして公開ページ自身を招待先にします。ローカルのWi-Fi用URLを公開ファイルへ埋め込まないでください。
 

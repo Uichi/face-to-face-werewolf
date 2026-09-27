@@ -31,9 +31,10 @@ export async function lobby(action: string, payload: Record<string, unknown>): P
   return data.room as Room;
 }
 
+let subscriptionId = 0;
 export function watchRoom(roomId: string, refresh: () => void) {
   if (!client) return () => {};
-  const channel = client.channel(`lobby:${roomId}`)
+  const channel = client.channel(`room:${roomId}:${++subscriptionId}`)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'room_updates', filter: `room_id=eq.${roomId}` }, refresh)
     .subscribe(status => { if (status === 'SUBSCRIBED') refresh(); });
   return () => { void client!.removeChannel(channel); };

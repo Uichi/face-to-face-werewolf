@@ -6,6 +6,8 @@ import type { Composition, Role } from '../domain/rules.ts';
 import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom } from './api.ts';
 import type { Room } from './types.ts';
 import { roleNames } from './types.ts';
+import GameScreen from './GameScreen.tsx';
+import { gameCommand, GameError } from './game-api.ts';
 import Turnstile from './Turnstile.tsx';
 import { invitationUrl, requestId as newRequestId } from './invite.ts';
 
@@ -46,6 +48,10 @@ export default function App() {
   const [captchaVersion, setCaptchaVersion] = useState(0);
   const [savedRoom, setSavedRoom] = useState(readSaved(LAST_ROOM));
   const operation = useRef(false);
+  const startRequest = useRef<{ revision: number; requestId: string } | null>(null);
+  const receiveRoom = useCallback((next: Room) => {
+    setRoom(current => current?.id === next.id && next.revision >= current.revision ? next : current);
+  }, []);
   const needsCaptcha = configured && Boolean(captchaSiteKey) && !sessionExists;
 
   useEffect(() => { void hasSession().then(setSessionExists).catch(() => {}); }, []);
@@ -121,13 +127,28 @@ export default function App() {
     finally { setBusy(false); operation.current = false; }
   }
 
+  async function startGame() {
+    if (!room || preview || operation.current) return;
+    if (!startRequest.current && !window.confirm('全員そろいましたか？ 役職を配ってゲームを開始します。')) return;
+    operation.current = true; setBusy(true); setError(''); setNotice('');
+    const request = startRequest.current ?? { revision: room.revision, requestId: newRequestId() };
+    startRequest.current = request;
+    try {
+      const result = await gameCommand('start', { roomId: room.id, ...request });
+      receiveRoom(result.room); startRequest.current = null;
+    } catch (e) {
+      setError((e as Error).message);
+      if (!(e instanceof GameError && e.retryable)) startRequest.current = null;
+    } finally { operation.current = false; setBusy(false); }
+  }
+
   return <div className="app">
     <header className="site-header"><button className="brand" onClick={home} aria-label="夜のよりあい トップへ"><Moon small/><span>夜のよりあい</span></button><span className="header-note">集まって、話して、見抜こう。</span><span className="edition">対面人狼</span></header>
     <main>
       {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
-      {room ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} /> : <>
+      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom}/> : <>
         {screen === 'home' ? <div className="home-grid">
           <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜10人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
@@ -153,12 +174,12 @@ export default function App() {
         <section className="promise"><Moon small/><p>ひみつはスマホに。会話は、この場で。</p><span>インストールも、専任の司会者もいりません。</span></section>
       </>}
     </main>
-    <footer><span>夜のよりあい</span><span>友だちと囲む、小さな推理の時間。</span><small>開発中 · {room ? '待機室' : 'はじめの一歩'}</small></footer>
+    <footer><span>夜のよりあい</span><span>友だちと囲む、小さな推理の時間。</span><small>開発中 · {room ? room.status === 'waiting' ? '待機室' : 'ゲーム' : 'はじめの一歩'}</small></footer>
   </div>;
 }
 
-function Lobby({ room, preview, busy, syncing, onSave, onNotice }: {
-  room: Room; preview: boolean; busy: boolean; syncing: boolean;
+function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart }: {
+  room: Room; preview: boolean; busy: boolean; syncing: boolean; onStart: () => Promise<void>;
   onSave: (composition: Composition | null, minutes: number) => Promise<void>; onNotice: (message: string) => void;
 }) {
   const [qr, setQr] = useState('');
@@ -207,7 +228,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice }: {
       <span className="code-label">{preview ? '部屋コードの見本' : '部屋コード'}</span><div className="room-code">{room.code.slice(0, 5)}<span> </span>{room.code.slice(5)}</div>
       {!preview && new URL(invite).protocol === 'http:' && <p className="inline-note">接続テスト中です。スマホをこのパソコンと同じWi-Fiにつないでから読み取ってください。</p>}
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
-      <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled>ゲーム開始は準備中</button><small>この版では、招待・参加・設定の変更まで確認できます。</small></div>
+      <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled={preview || busy || !isHost || count < 5 || !room.composition || Boolean(currentError)} onClick={() => void onStart()}>{busy ? '準備しています…' : isHost ? 'ゲームを開始する' : '主催者の開始を待っています'}</button><small>{preview ? 'プレビューではゲームを開始できません。' : '全員そろったら開始しましょう。開始後の新規参加はできません。'}</small></div>
     </aside></div>
     <div className="lobby-bottom"><span>◌</span><p>画面を閉じても、同じブラウザから席に戻れます。<br/><small>接続が切れても、すぐに脱落することはありません。</small></p></div>
   </div>;
