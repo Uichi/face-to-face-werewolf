@@ -38,6 +38,8 @@ Node.js 24で`npm ci`、続いて`npm run dev`を実行します。接続先が�
 
 React + TypeScript / Supabase（匿名認証、データベース、リアルタイム配信）。ホスティングの初期候補はCloudflare Pagesです。利用条件・料金は公開前に確認します。
 
+今回の公開にはSitesの静的ホスティングを使用します。`.openai/hosting.json`が公開先を識別します。公開ビルドでは`VITE_INVITE_BASE_URL`を空にして公開ページ自身を招待先にします。ローカルのWi-Fi用URLを公開ファイルへ埋め込まないでください。
+
 ルール処理はサーバー専用です。全員の役職を含む内部状態をブラウザに渡してはいけません。クライアントには権限ごとに絞った情報だけを返します。
 
 GitHubの接続先は https://github.com/Uichi/face-to-face-werewolf です。秘密鍵・認証情報・実際の試合データは保存しません。
