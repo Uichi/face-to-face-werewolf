@@ -7,6 +7,7 @@ import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom
 import type { Room } from './types.ts';
 import { roleNames } from './types.ts';
 import Turnstile from './Turnstile.tsx';
+import { invitationUrl, requestId as newRequestId } from './invite.ts';
 
 const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
@@ -97,7 +98,7 @@ export default function App() {
     try {
       await ensureSession(token || undefined); setSessionExists(true);
       let requestId = readSaved(REQUEST);
-      if (screen === 'create' && !requestId) { requestId = crypto.randomUUID(); save(REQUEST, requestId); }
+      if (screen === 'create' && !requestId) { requestId = newRequestId(); save(REQUEST, requestId); }
       const next = await lobby(screen === 'create' ? 'create' : 'join', { nickname: nickname.normalize('NFKC').trim(), code, requestId });
       save(LAST_ROOM, next.id); setSavedRoom(next.id); save(REQUEST, null);
       setRoom(next); setPreview(false); setNotice('');
@@ -167,8 +168,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice }: {
   const [draft, setDraft] = useState<Composition>(room.composition ?? { ...DEFAULT_COMPOSITIONS[5]! });
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
-  const url = new URL(location.pathname, location.origin); url.searchParams.set(preview ? 'preview' : 'room', preview ? '1' : room.code);
-  const invite = url.toString();
+  const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
   const host = room.members.find(m => m.id === room.hostId);
   let settingError = '';
   try { if (custom) validateComposition(count, draft); } catch (e) { settingError = (e as Error).message; }
@@ -205,6 +205,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice }: {
     </div><aside className="invite-panel"><div className="section-number">INVITE YOUR FRIENDS</div><h2>この輪に、招待しよう。</h2><p>近くの仲間にQRコードを見せるか、<br/>部屋コードを伝えてください。</p>
       <div className="qr-wrap">{qr && <img src={qr} alt={preview ? 'プレビュー用QRコード（実際の招待ではありません）' : '部屋の招待QRコード'} width={180} height={180}/>}</div>
       <span className="code-label">{preview ? '部屋コードの見本' : '部屋コード'}</span><div className="room-code">{room.code.slice(0, 5)}<span> </span>{room.code.slice(5)}</div>
+      {!preview && new URL(invite).protocol === 'http:' && <p className="inline-note">接続テスト中です。スマホをこのパソコンと同じWi-Fiにつないでから読み取ってください。</p>}
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
       <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled>ゲーム開始は準備中</button><small>この版では、招待・参加・設定の変更まで確認できます。</small></div>
     </aside></div>

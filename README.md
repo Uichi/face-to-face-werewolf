@@ -24,6 +24,12 @@ Node.js 24で`npm ci`、続いて`npm run dev`を実行します。接続先が�
 
 `npm run build`で型検査と公開用ファイルの作成、`npm run preview`で作成したファイルの表示を確認できます。
 
+### 同じWi-Fiのスマホで試す
+
+`npm run dev -- --host 0.0.0.0`で起動し、表示されたNetworkのURLを`.env.local`の`VITE_INVITE_BASE_URL`に設定して再起動します。パソコンでlocalhostを開いていても、QRと招待リンクはそのNetworkのURLになります。端末は同じWi-Fiに接続してください。ネットワークが端末間通信を禁止している場合は接続できません。Wi-FiやIPが変わった場合は設定を更新します。
+
+公開時は`VITE_INVITE_BASE_URL`を空にするか、公開先のHTTPS URLに変更してビルドします。
+
 ## 検証
 
 `npm run typecheck`で型検査、`npm test`でゲーム処理・部屋のSQL・権限制限を検証します。Supabaseの実環境とスマホの実機での検証は、接続設定後に行います。
