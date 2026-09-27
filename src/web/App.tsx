@@ -185,7 +185,7 @@ export default function App() {
       {notice && <div className="message" role="status">{notice}</div>}
       {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom} onHome={home}/> : <>
         {screen === 'home' ? <div className="home-grid">
-          <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜10人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
+          <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜13人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
             <button className="action-card" disabled={busy} onClick={() => { setScreen('create'); setError(''); }}><span className="action-icon">＋</span><span><strong>部屋をつくる</strong><small>主催者になって、みんなを招待</small></span><span className="arrow">↗</span></button>
             <button className="action-card secondary-card" disabled={busy} onClick={() => { setScreen('join'); setError(''); }}><span className="action-icon">⌗</span><span><strong>部屋に参加する</strong><small>招待された部屋のコードを入力</small></span><span className="arrow">→</span></button>
@@ -239,7 +239,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   return <div className="lobby">
     <div className="lobby-title"><div><div className="section-number">THE GATHERING</div><h1>今夜の待ち合わせ。</h1><p className="muted">みんなが集まるまで、ひと息。</p></div><span className={`status-pill ${syncing ? 'offline' : ''}`}><span className="dot"/>{preview ? 'プレビュー' : syncing ? '再接続を待っています' : '参加を受付中'}</span></div>
     <div className="lobby-grid"><div className="lobby-main">
-      <section className="panel"><div className="panel-heading"><h2>集まった仲間</h2><span><b>{count}</b> / 10人</span></div><div className="members">
+      <section className="panel"><div className="panel-heading"><h2>集まった仲間</h2><span><b>{count}</b> / 13人</span></div><div className="members">
         {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span>{isHost && !preview && member.id !== room.viewerId && <button className="member-remove" disabled={busy} aria-label={`${member.nickname}さんを待機室から削除`} onClick={() => void onMember('remove', member.id)}>削除</button>}</div>)}
         {count < 5 && <div className="empty-seat"><span>＋</span>あと{5 - count}人で、始められる人数になります。</div>}
       </div></section>
@@ -252,7 +252,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         {editing && isHost && <form className="settings-form" onSubmit={e => { e.preventDefault(); void onSave(custom ? draft : null, minutes); }}>
           <label>議論時間<select value={minutes} onChange={e => setMinutes(Number(e.target.value))}>{Array.from({ length: 10 }, (_, i) => <option value={i + 1} key={i}>{i + 1}分</option>)}</select></label>
           <label className="check-label"><input type="checkbox" checked={custom} onChange={e => setCustom(e.target.checked)}/>配役を自分で決める</label>
-          {custom && <div className="role-inputs">{(Object.keys(roleNames) as Role[]).map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 10 : 1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/></label>)}</div>}
+          {custom && <div className="role-inputs">{(Object.keys(roleNames) as Role[]).map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : 1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/></label>)}</div>}
           {settingError && <p className="field-error" role="alert">{settingError}</p>}
           <button className="primary" disabled={busy || Boolean(settingError)}>設定を保存</button>
         </form>}

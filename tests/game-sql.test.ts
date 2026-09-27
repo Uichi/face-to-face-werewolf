@@ -16,7 +16,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270006_ending.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609270007_thirteen_players.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  async function user(id:string) { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec('set role authenticated'); }
  async function raw(name:string, action:string, payload:Record<string,unknown>) {
   const result=await db.query<{data:Response}>(`select public.${name}($1,$2::jsonb) data`,[action,JSON.stringify(payload)]);return result.rows[0]!.data;
@@ -38,7 +38,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
   return {roomId,users,memberUsers,state,call,allConfirm,expire,get response(){return r;},get host(){return r.room.hostId;}};
  }
  try {
-  for(const count of [5,8,10]) await t.test(`${count}人で役職確認→投票→終了→再戦、個別票は返さない`,async()=>{
+  for(const count of [5,8,10,11,12,13]) await t.test(`${count}人で役職確認→投票→終了→再戦、個別票は返さない`,async()=>{
    const f=await setup(count);const g=await f.state();
    const wolfIds=g.players.filter(p=>p.role==='wolf').map(p=>p.id);
    const seer=g.players.find(p=>p.role==='seer')!;
@@ -78,6 +78,16 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    const restarted=await f.call(f.host,'rematch');assert.equal(restarted.game,null);assert.equal(restarted.room.status,'waiting');
    await user(f.users[0]!);const next=await raw('game_command','start',{roomId:f.roomId,revision:restarted.room.revision,requestId:randomUUID()});
    assert.notEqual(next.game!.public.id,g.id);assert.equal(next.game!.public.phase,'roles');assert.equal(next.game!.public.ending,null);assert.deepEqual(next.game!.private!.results,[]);
+  });
+  await t.test('13人で村人12人のカスタム配役も保存・開始できる',async()=>{
+   const f=await setup(13);const original=await f.state();
+   for(const wolf of original.players.filter(p=>p.role==='wolf'))await f.call(f.host,'remove',{targetId:wolf.id});
+   const waiting=await f.call(f.host,'rematch');await user(f.users[0]!);
+   const comp={villager:12,wolf:1,seer:0,medium:0,knight:0};
+   const settings=await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:10,composition:comp});
+   assert.equal(settings.ok,true);
+   const started=await raw('game_command','start',{roomId:f.roomId,revision:settings.room.revision,requestId:randomUUID()});
+   assert.equal(started.ok,true);assert.equal(started.game!.public.players.length,13);assert.deepEqual(started.game!.public.composition,comp);
   });
   await t.test('旧段階・二重送信・他人の操作・直接の秘密データ取得を検証',async()=>{
    const f=await setup(5);const g=await f.state();const target=g.players[1]!.id;

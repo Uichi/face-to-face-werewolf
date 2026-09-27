@@ -7,8 +7,8 @@ const make = (roles: Role[]): Player[] => roles.map((role, index) => ({ id: Stri
 const five = () => make(['wolf', 'seer', 'villager', 'villager', 'villager']);
 const choose = (targets: string[]) => targets.map((targetId, index) => ({ actorId: String(index), targetId }));
 
-test('5〜10人の標準配役を検証し、過不足なく配布する', () => {
-  for (let count = 5; count <= 10; count++) {
+test('5〜13人の標準配役を検証し、過不足なく配布する', () => {
+  for (let count = 5; count <= 13; count++) {
     const composition = DEFAULT_COMPOSITIONS[count]!;
     validateComposition(count, composition);
     const players = assignRoles(Array.from({ length: count }, (_, i) => String(i)), composition, max => max - 1);
@@ -21,6 +21,7 @@ test('5〜10人の標準配役を検証し、過不足なく配布する', () =>
 
 test('人数範囲・合計・人狼数・能力職上限・小数の不正を拒否する', () => {
   for (const [count, composition] of [
+    [14, { villager: 8, wolf: 3, seer: 1, medium: 1, knight: 1 }],
     [4, { villager: 2, wolf: 1, seer: 1, medium: 0, knight: 0 }],
     [5, { ...DEFAULT_COMPOSITIONS[5]!, villager: 4 }],
     [5, { villager: 4, wolf: 0, seer: 1, medium: 0, knight: 0 }],

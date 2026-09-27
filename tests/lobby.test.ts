@@ -6,7 +6,7 @@ import type { Room } from '../src/web/types.ts';
 
 test('待機室SQL: 認証・作成・参加・復帰・権限・人数・設定・期限・主催者移行', async t => {
   const db = new PGlite();
-  const ids = Array.from({ length: 15 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
+  const ids = Array.from({ length: 18 }, (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`);
   await db.exec(`
     create role anon; create role authenticated;
     create schema auth; create table auth.users(id uuid primary key);
@@ -16,6 +16,7 @@ test('待機室SQL: 認証・作成・参加・復帰・権限・人数・設定
   `);
   for (const id of ids) await db.query('insert into auth.users values($1)', [id]);
   await db.exec(await readFile(new URL('../supabase/migrations/202609250001_lobby.sql', import.meta.url), 'utf8'));
+  for (const file of ['202609270003_game.sql','202609270007_thirteen_players.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   async function asUser(id: string | null) {
     await db.exec('reset role');
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [id ?? '']);
@@ -77,15 +78,15 @@ test('待機室SQL: 認証・作成・参加・復帰・権限・人数・設定
       assert.equal(result.ok, true); room = result.room;
       assert.equal(room.discussionMinutes, 4); assert.equal(room.customComposition, true);
     });
-    await t.test('10人を超える参加は拒否し、11人目の席を作らない', async () => {
-      for (let i = 5; i < 10; i++) {
+    await t.test('13人を超える参加は拒否し、14人目の席を作らない', async () => {
+      for (let i = 5; i < 13; i++) {
         await asUser(ids[i]!); assert.equal((await command('join', { code: room.code, nickname: `参加者${i}` })).ok, true);
       }
-      await asUser(ids[10]!); assert.equal((await command('join', { code: room.code, nickname: '11人目' })).ok, false);
+      await asUser(ids[13]!); assert.equal((await command('join', { code: room.code, nickname: '14人目' })).ok, false);
     });
     await t.test('開始後の新規参加は不可、既存参加者の復帰は可', async () => {
       await db.exec('reset role'); await db.query("update app_private.rooms set status = 'playing' where id = $1", [room.id]);
-      await asUser(ids[10]!); assert.equal((await command('join', { code: room.code, nickname: '途中参加' })).ok, false);
+      await asUser(ids[13]!); assert.equal((await command('join', { code: room.code, nickname: '途中参加' })).ok, false);
       await asUser(ids[1]!); assert.equal((await command('join', { code: room.code, nickname: 'Aoi' })).ok, true);
     });
     await t.test('主催者60秒切断時は接続中の入室順、旧主催者の復帰で奪い返さない', async () => {
@@ -97,15 +98,15 @@ test('待機室SQL: 認証・作成・参加・復帰・権限・人数・設定
       assert.equal(moved.room.hostId, moved.room.members[1]!.id);
       await asUser(ids[0]!); const returned = await command('heartbeat', { roomId: room.id });
       assert.equal(returned.room.hostId, moved.room.hostId);
-      assert.equal(returned.room.members.length, 10);
+      assert.equal(returned.room.members.length, 13);
     });
     await t.test('存在しないコードの失敗試行も回数制限に数える', async () => {
-      await asUser(ids[11]!);
+      await asUser(ids[14]!);
       for (let i = 0; i < 20; i++) assert.equal((await command('join', { code: '0000000000', nickname: 'テスト' })).ok, false);
       assert.match((await command('join', { code: room.code, nickname: 'テスト' })).message!, /試行が多い/);
     });
     await t.test('部屋作成を1時間に3件までに制限する', async () => {
-      await asUser(ids[12]!);
+      await asUser(ids[15]!);
       for (let i = 0; i < 3; i++) assert.equal((await command('create', { nickname: '作成者', requestId: ids[i] })).ok, true);
       assert.match((await command('create', { nickname: '作成者', requestId: ids[3] })).message!, /作成回数/);
     });

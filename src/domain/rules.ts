@@ -15,6 +15,9 @@ export const DEFAULT_COMPOSITIONS: Readonly<Record<number, Readonly<Composition>
   8: Object.freeze({ villager: 3, wolf: 2, seer: 1, medium: 1, knight: 1 }),
   9: Object.freeze({ villager: 4, wolf: 2, seer: 1, medium: 1, knight: 1 }),
   10: Object.freeze({ villager: 5, wolf: 2, seer: 1, medium: 1, knight: 1 }),
+  11: Object.freeze({ villager: 6, wolf: 2, seer: 1, medium: 1, knight: 1 }),
+  12: Object.freeze({ villager: 6, wolf: 3, seer: 1, medium: 1, knight: 1 }),
+  13: Object.freeze({ villager: 7, wolf: 3, seer: 1, medium: 1, knight: 1 }),
 });
 
 function requireRule(condition: unknown, message: string): asserts condition {
@@ -29,7 +32,7 @@ function pick<T>(values: readonly T[], random: RandomIndex): T {
 }
 
 export function validateComposition(count: number, composition: Composition): void {
-  requireRule(Number.isInteger(count) && count >= 5 && count <= 10, '参加人数は5〜10人です');
+  requireRule(Number.isInteger(count) && count >= 5 && count <= 13, '参加人数は5〜13人です');
   requireRule(roles.every(role => Number.isInteger(composition[role]) && composition[role] >= 0), '配役は非負整数です');
   requireRule(roles.reduce((sum, role) => sum + composition[role], 0) === count, '配役合計が参加人数と一致しません');
   requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、村側より少なくしてください');
