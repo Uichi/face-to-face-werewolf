@@ -64,6 +64,7 @@ test('議論の時間切れで投票、投票時間切れでは自動投票せ�
   f.vote({ v0: 'w', v1: 'w', v2: 'w', w: 'v0', s: 'w' });
   assert.equal(f.game.phase, 'finished');
   assert.equal(f.game.winner, 'village');
+  assert.deepEqual(viewFor(f.game, 'v0').public.ending, {playerId:'w',cause:'execution',day:f.game.day});
 });
 
 test('選択は変更可、確定後は変更不可。主催者権限と未選択の確定を検証', () => {
@@ -103,14 +104,13 @@ test('同票→決選で候補者も投票し自己投票不可、再同票な�
   assert.equal(g.game.players.filter(p => p.alive).length, 4);
 });
 
-test('夜は能力なしの確認も必要、全員完了しても60秒まで待つ', () => {
+test('夜は能力なしの確認も必要、最後の確認で60秒を待たずに進む', () => {
   const f = fixture(); toNight(f);
   f.send('w', { type: 'select', targetId: 'v1' }); f.send('w', { type: 'confirm' });
   f.send('s', { type: 'select', targetId: 'w' }); f.send('s', { type: 'confirm' });
-  f.send('v0', { type: 'confirm' }); f.send('v1', { type: 'confirm' });
-  assert.equal(f.game.phase, 'night');
-  f.time(59_999); f.tick(); assert.equal(f.game.phase, 'night');
-  f.time(60_000); f.tick(); assert.equal(f.game.phase, 'morning');
+  f.send('v0', { type: 'confirm' }); assert.equal(f.game.phase, 'night');
+  f.time(1); f.send('v1', { type: 'confirm' });
+  assert.equal(f.game.phase, 'morning');
   assert.equal(f.game.victimId, 'v1'); assert.equal(f.game.day, 2);
   assert.equal(viewFor(f.game, 's').private!.results.at(-1)!.isWolf, true);
   f.send('v0', { type: 'next' }); assert.equal(f.game.phase, 'discussion');
@@ -180,6 +180,7 @@ test('初夜中の脱落は白通知と既存確認を保持し、残り全員�
 test('途中脱落で勝敗成立なら直ちに終了し、追加の操作不可', () => {
   const f = fixture(); f.send('v0', { type: 'remove', targetId: 'w' });
   assert.equal(f.game.phase, 'finished'); assert.equal(f.game.winner, 'village');
+  assert.deepEqual(viewFor(f.game,'v0').public.ending,{playerId:'w',cause:'disconnect',day:1});
   assert.throws(() => f.send('v0', { type: 'next' }));
   assert.ok(viewFor(f.game, 'v0').public.players.every(p => p.role));
   assert.equal(viewFor(f.game, 'v0').private, null);
@@ -229,20 +230,15 @@ test('初夜前の脱落でも生存者の確認で進み、役職は再配布�
   assert.deepEqual(f.game.players.map(p => p.role), roles);
 });
 
-test('複数人狼の不一致も各自の確定で完了に数え、夜の延長後まで襲撃を待つ', () => {
+test('複数人狼の不一致も全員確定で即時処理し、延長済みでも待たない', () => {
   const f = fixture(8); toNight(f);
   f.send('w0', { type: 'select', targetId: 'v1' });
   f.send('w1', { type: 'select', targetId: 's' });
   f.send('s', { type: 'select', targetId: 'w0' });
   f.send('k', { type: 'select', targetId: 'm' });
-  f.confirmAll();
-  assert.equal(viewFor(f.game, 'v0').public.completedCount, 7);
-  assert.equal(f.game.phase, 'night');
-  assert.throws(() => f.send('w0', { type: 'select', targetId: 's' }));
-  f.time(50_000); f.send('v0', { type: 'extend' });
+  f.time(1000); f.send('v0', { type: 'extend' });
   assert.equal(f.game.deadline, 120_000);
-  f.time(60_000); f.tick(); assert.equal(f.game.phase, 'night');
-  f.time(120_000); f.tick();
+  f.confirmAll();
   assert.equal(f.game.phase, 'morning'); assert.equal(f.game.victimId, 'v1');
 });
 
@@ -251,7 +247,23 @@ test('夜の犠牲者発生で人狼数と村側が同数になれば即終了�
   f.send('v0', { type: 'remove', targetId: 'v1' });
   f.send('w', { type: 'select', targetId: 's' });
   f.send('s', { type: 'select', targetId: 'w' }); f.confirmAll();
-  f.time(60_000); f.tick();
+  assert.equal(f.game.lastTime, 0);
   assert.equal(f.game.phase, 'finished'); assert.equal(f.game.winner, 'wolves');
   assert.equal(f.game.victimId, 's');
+  assert.deepEqual(viewFor(f.game,'v0').public.ending,{playerId:'s',cause:'attack',day:1});
+});
+
+
+test('脱落した主催者の確認は不要で、生存者全員の夜完了で即座に朝になる', () => {
+  const f=fixture(7); toNight(f);
+  f.send('v0', {type:'remove',targetId:'v0'});
+  f.send('w', {type:'select',targetId:'v1'});
+  f.send('s', {type:'select',targetId:'w'});
+  f.send('k', {type:'select',targetId:'v1'});
+  for(const id of ['w','s','k','v1'])f.send(id,{type:'confirm'});
+  assert.equal(f.game.phase,'night');
+  f.send('m',{type:'confirm'});
+  assert.equal(f.game.phase,'morning'); assert.equal(f.game.victimId,null);
+  assert.equal(f.game.lastTime,0); assert.equal(f.game.hostId,'v0');
+  assert.equal(viewFor(f.game,'v0').private,null);
 });

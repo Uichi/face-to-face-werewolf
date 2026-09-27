@@ -5,6 +5,7 @@ import { gameCommand, GameError } from './game-api.ts';
 import type { GameResponse, GameView } from './game-api.ts';
 import { requestId } from './invite.ts';
 import { watchRoom } from './api.ts';
+import GameResult from './GameResult.tsx';
 import type { Role } from '../domain/rules.ts';
 
 type Pending = { action: string; payload: Record<string, unknown> };
@@ -97,9 +98,9 @@ export default function GameScreen({ room, onRoom }: { room: Room; onRoom: (room
    <div className="game-top"><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1>{phaseNames[phase]}</h1></div>{seconds!==null&&<div className="game-timer" role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
    {offline&&<div className="message" role="status">接続を確認しています。操作の結果を確認できるまで、このままお待ちください。</div>}
    {error&&<div className="message error" role="alert">{error}{pending&&<button className="text-button" disabled={busy} onClick={()=>void send(pending.action,{},pending)}>同じ操作を再送する</button>}</div>}
-   {pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
+   {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
    {!self.alive&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
-   {phase==='finished'?<section className="panel result-panel"><div className="section-number">THE END</div><h2>{pub.winner==='village'?'村側の勝利':'人狼側の勝利'}</h2><p>おつかれさまでした。みんなの役職を振り返りましょう。</p><div className="result-roles">{pub.players.map(p=><div key={p.id}><span>{name(p.id)}{p.id===me?'（あなた）':''}</span><strong>{p.role?roleNames[p.role]:''}</strong><small>{p.alive?'生存':'脱落'}</small></div>)}</div>{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じメンバーで再戦</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}</section>:<>
+   {phase==='finished'?<GameResult game={pub} room={room}>{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じメンバーで再戦</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}</GameResult>:<>
      {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<p className="muted">周りに画面を見せないように確認してください。</p>:<div className="secret-content"><span className="role-team">{role==='wolf'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
        {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p>{night&&game.wolves.selections.map(s=><p key={s.actorId}>{name(s.actorId)}：{s.targetId?name(s.targetId):'未選択'}</p>)}</div>}
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
@@ -112,7 +113,7 @@ export default function GameScreen({ room, onRoom }: { room: Room; onRoom: (room
        {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛はありません。自分の情報を確認したら、夜の確認を完了してください。</p>{self.alive&&confirmButton}</>}
        {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2><p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
        {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>自分以外の生存者に投票します。確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
-       {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
+       {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
        {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:'同票のため、処刑はありません'}</h2><p>脱落した人の役職は、試合終了まで公開されません。</p></>}
        {phase==='morning'&&<><h2>{pub.victimId?`${name(pub.victimId)}さんが犠牲になりました`:'今朝の犠牲者はいません'}</h2><p>結果を確認したら、次の議論に進みましょう。</p></>}
        {['roles','firstNight','vote','runoff','night'].includes(phase)&&<div className="completion"><span>操作完了</span><strong>{pub.completedCount} / {pub.requiredCount}人</strong><progress value={pub.completedCount} max={pub.requiredCount}/></div>}

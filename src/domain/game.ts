@@ -2,6 +2,7 @@
 import { assignRoles, eliminate, getWinner, initialWhite, resolveNight, resolveVote } from './rules.ts';
 import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules.ts';
 
+export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number };
 export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'finished';
 type Secret = { recipientId: string; targetId: string; isWolf: boolean; kind: 'initial' | 'seer' | 'medium'; day: number };
 type Action =
@@ -25,6 +26,7 @@ export type Game = {
   day: number; discussionMs: number; deadline: number | null; lastTime: number;
   selections: Record<string, string>; confirmed: string[]; runoffIds: string[];
   voteResult: VoteResult | null; victimId: string | null; winner: Team | null;
+  lastElimination?: Elimination | null;
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
 };
@@ -88,6 +90,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       if (result.executedId) {
         const death = eliminate(game.players, result.executedId, 'execution');
         game.players = death.players;
+        game.lastElimination = { playerId: result.executedId, cause: 'execution', day: game.day };
         if (death.mediumResult) game.secrets.push({
           recipientId: death.mediumResult.mediumId, targetId: result.executedId,
           isWolf: death.mediumResult.isWolf, kind: 'medium', day: game.day,
@@ -95,7 +98,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       }
       if (!finishIfWon(game, now)) enter(game, 'execution', now);
     }
-  } else if (game.phase === 'night' && allDone(game) && now >= game.deadline!) {
+  } else if (game.phase === 'night' && allDone(game)) {
     const actionOf = (p: Player) => ({ actorId: p.id, targetId: game.selections[p.id]! });
     const living = alive(game);
     const seer = living.find(p => p.role === 'seer');
@@ -107,6 +110,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     }, random);
     game.players = result.players;
     game.victimId = result.victimId;
+    if (result.victimId) game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day };
     if (result.divination) game.secrets.push({
       recipientId: result.divination.seerId, targetId: result.divination.targetId,
       isWolf: result.divination.isWolf, kind: 'seer', day: game.day,
@@ -182,6 +186,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
       case 'remove': {
         const death = eliminate(game.players, action.targetId, 'disconnect');
         game.players = death.players;
+        game.lastElimination = { playerId: action.targetId, cause: 'disconnect', day: game.day };
         game.removals.push({ playerId: action.targetId, day: game.day });
         if (!finishIfWon(game, now)) {
           if (['vote', 'runoff', 'night'].includes(game.phase)) {
@@ -218,6 +223,7 @@ export function viewFor(game: Game, viewerId: string) {
     requiredCount: alive(game).length,
     runoffIds: [...game.runoffIds], voteResult: structuredClone(game.voteResult), victimId: game.victimId,
     removals: structuredClone(game.removals),
+    ending: isFinished ? structuredClone(game.lastElimination ?? null) : null,
   };
   if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null };
   return {
