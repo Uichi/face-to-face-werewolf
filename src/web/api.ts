@@ -23,10 +23,20 @@ export async function ensureSession(captchaToken?: string) {
   })().finally(() => { signingIn = null; });
   return signingIn;
 }
+export class RoomAccessLostError extends Error {}
+export async function membership(action: 'remove' | 'leave', payload: Record<string, unknown>): Promise<{ room?: Room; left?: boolean }> {
+  if (!client) throw new Error('接続先が設定されていません。');
+  const { data, error } = await client.rpc('membership_command', { action, payload });
+  if (error?.code === 'PGRST202') throw new Error('参加者の整理機能は設定の追加待ちです。追加後にページを更新してください。');
+  if (error) throw new Error(error.code === 'P0001' ? error.message : '通信を確認して、もう一度お試しください。');
+  if (!data?.ok) throw new Error(data?.message || '操作を完了できませんでした。');
+  return data;
+}
 export async function lobby(action: string, payload: Record<string, unknown>): Promise<Room> {
   if (!client) throw new Error('接続先が設定されていません。');
   const { data, error } = await client.rpc('lobby_command', { action, payload });
   if (error) throw new Error('部屋に接続できませんでした。通信を確認して、もう一度お試しください。');
+  if (data?.code === 'ROOM_ACCESS_LOST') throw new RoomAccessLostError(data.message);
   if (!data?.ok) throw new Error(data?.message || '操作を完了できませんでした。');
   return data.room as Room;
 }

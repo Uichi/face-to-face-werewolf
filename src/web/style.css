@@ -10,3 +10,5 @@
 @media(max-width:700px){.game-screen{gap:16px}.game-top h1{font-size:25px}.game-timer{padding:8px 12px}.game-timer strong{font-size:24px}.night-screen .game-top{padding:16px}.game-screen .panel{padding:20px 17px}.target-grid{gap:8px}.target-button{font-size:15px;padding:12px}.target-button.selected{padding:11px}.game-players{gap:0 14px}.game-players>div{font-size:14px}.game-screen .private-panel .panel-heading{gap:8px;flex-wrap:wrap}.game-screen .private-panel .text-button{margin-left:auto}.confirm-dialog{padding:24px 20px}.result-roles>div{flex-wrap:wrap}.game-screen .host-actions{flex-direction:column}}
 
 .confirm-dialog{border:1px solid #dfe3d9}.confirm-dialog::backdrop{background:#172c24b8}
+
+.member-remove{border:1px solid #d9c8bb;background:#fff9f4;color:#8b543b;border-radius:4px;min-height:44px;min-width:52px;padding:8px;font-size:13px;flex-shrink:0}.member>div:nth-child(2){min-width:0}.leave-area{margin:26px 0;text-align:center}.leave-area p{font-size:13px;line-height:1.8;color:#758076}.saved-room-actions{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px 22px}.saved-room-actions .text-button{font-size:13px;min-height:44px}

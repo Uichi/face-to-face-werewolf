@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import QRCode from 'qrcode';
 import { DEFAULT_COMPOSITIONS, validateComposition } from '../domain/rules.ts';
 import type { Composition, Role } from '../domain/rules.ts';
-import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom } from './api.ts';
+import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom, membership, RoomAccessLostError } from './api.ts';
 import type { Room } from './types.ts';
 import { roleNames } from './types.ts';
 import GameScreen from './GameScreen.tsx';
@@ -52,6 +52,10 @@ export default function App() {
   const receiveRoom = useCallback((next: Room) => {
     setRoom(current => current?.id === next.id && next.revision >= current.revision ? next : current);
   }, []);
+  const clearSavedRoom = useCallback((id?: string) => {
+    if (!id || readSaved(LAST_ROOM) === id) { save(LAST_ROOM, null); setSavedRoom(null); }
+    startRequest.current = null;
+  }, []);
   const needsCaptcha = configured && Boolean(captchaSiteKey) && !sessionExists;
 
   useEffect(() => { void hasSession().then(setSessionExists).catch(() => {}); }, []);
@@ -66,9 +70,9 @@ export default function App() {
       if (!await hasSession()) throw new Error('このブラウザの参加情報が見つかりません。招待コードから参加してください。');
       const restored = await lobby('heartbeat', { roomId: id });
       setPreview(false); setRoom(restored);
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) { if (e instanceof RoomAccessLostError) clearSavedRoom(id); setError((e as Error).message); }
     finally { setBusy(false); operation.current = false; }
-  }, []);
+  }, [clearSavedRoom]);
   useEffect(() => {
     if (configured && savedRoom && !inviteCode() && !new URLSearchParams(location.search).has('preview')) void resume(savedRoom);
     // The mount restore must not run again after a user chooses another screen.
@@ -87,7 +91,11 @@ export default function App() {
           setRoom(current => current?.id === id && next.revision >= current.revision ? next : current);
           setSyncing(false);
         }
-      } catch { if (!disposed) setSyncing(true); }
+      } catch (e) {
+        if (!disposed && e instanceof RoomAccessLostError) {
+          clearSavedRoom(id); setRoom(null); setScreen('home'); setSyncing(false); setNotice(e.message); setError('');
+        } else if (!disposed) setSyncing(true);
+      }
       finally { loading = false; }
     };
     const stop = watchRoom(id, () => { void refresh(); });
@@ -96,7 +104,7 @@ export default function App() {
     window.addEventListener('online', visible); document.addEventListener('visibilitychange', visible);
     void refresh();
     return () => { disposed = true; stop(); clearInterval(timer); window.removeEventListener('online', visible); document.removeEventListener('visibilitychange', visible); };
-  }, [room?.id, preview]);
+  }, [room?.id, preview, clearSavedRoom]);
 
   async function enterRoom(event: FormEvent) {
     event.preventDefault(); if (operation.current) return;
@@ -109,7 +117,7 @@ export default function App() {
       save(LAST_ROOM, next.id); setSavedRoom(next.id); save(REQUEST, null);
       setRoom(next); setPreview(false); setNotice('');
       history.replaceState(null, '', location.pathname);
-    } catch (e) { setError((e as Error).message); setToken(''); setCaptchaVersion(v => v + 1); }
+    } catch (e) { if (screen === 'create' && e instanceof RoomAccessLostError) save(REQUEST, null); setError((e as Error).message); setToken(''); setCaptchaVersion(v => v + 1); }
     finally { setBusy(false); operation.current = false; }
   }
   function home() { setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); history.replaceState(null, '', location.pathname); }
@@ -125,6 +133,30 @@ export default function App() {
       setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。');
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); operation.current = false; }
+  }
+
+  async function manageMember(action: 'remove' | 'leave', targetId?: string) {
+    if (!room || preview || operation.current) return;
+    const target = room.members.find(m => m.id === targetId);
+    const text = action === 'remove'
+      ? `${target?.nickname ?? 'この参加者'}さんを待機室から削除しますか？ 配役は人数に合わせたおすすめに戻ります。`
+      : '部屋から退出しますか？ 主催者なら次の参加者へ権限を移し、最後の1人なら部屋を削除します。配役はおすすめに戻ります。';
+    if (!window.confirm(text)) return;
+    operation.current = true; setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await membership(action, { roomId: room.id, memberId: room.viewerId, revision: room.revision, targetId });
+      if (result.left) { clearSavedRoom(room.id); home(); setNotice('部屋から退出しました。'); }
+      else if (result.room) { receiveRoom(result.room); setNotice('参加者を削除し、配役をおすすめに戻しました。'); }
+    } catch (e) {
+      setError((e as Error).message);
+      // Recover after an ambiguous response without changing any newer room.
+      try { receiveRoom(await lobby('get', { roomId: room.id })); }
+      catch (refreshError) { if (refreshError instanceof RoomAccessLostError) { clearSavedRoom(room.id); home(); setNotice(refreshError.message); } }
+    } finally { operation.current = false; setBusy(false); }
+  }
+  function forgetHistory() {
+    if (!window.confirm('この端末の「前の部屋に戻る」を消しますか？ 待機室の参加者からも消す場合は、部屋に戻って退出してください。')) return;
+    clearSavedRoom(); setNotice('この端末の部屋履歴を消しました。');
   }
 
   async function startGame() {
@@ -148,13 +180,13 @@ export default function App() {
       {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
-      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom}/> : <>
+      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom}/> : <>
         {screen === 'home' ? <div className="home-grid">
           <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜10人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
             <button className="action-card" onClick={() => { setScreen('create'); setError(''); }}><span className="action-icon">＋</span><span><strong>部屋をつくる</strong><small>主催者になって、みんなを招待</small></span><span className="arrow">↗</span></button>
             <button className="action-card secondary-card" onClick={() => { setScreen('join'); setError(''); }}><span className="action-icon">⌗</span><span><strong>部屋に参加する</strong><small>招待された部屋のコードを入力</small></span><span className="arrow">→</span></button>
-            {savedRoom && configured && <button className="resume" disabled={busy} onClick={() => void resume(savedRoom)}>前の部屋に戻る →</button>}
+            {savedRoom && <div className="saved-room-actions">{configured && <button className="resume" disabled={busy} onClick={() => void resume(savedRoom)}>前の部屋に戻る →</button>}<button className="text-button" disabled={busy} onClick={forgetHistory}>部屋の履歴を消す</button></div>}
             {!configured && <div className="preview-note"><span className="dot"/>現在は画面確認版です。<button className="text-button" onClick={() => { setPreview(true); setRoom(demoRoom()); setError(''); }}>待機室をプレビュー →</button></div>}
             <div className="how"><div><b>1</b><span>仲間を招待</span></div><i/><div><b>2</b><span>役職を確認</span></div><i/><div><b>3</b><span>会話で推理</span></div></div>
           </section>
@@ -178,8 +210,8 @@ export default function App() {
   </div>;
 }
 
-function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart }: {
-  room: Room; preview: boolean; busy: boolean; syncing: boolean; onStart: () => Promise<void>;
+function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMember }: {
+  room: Room; preview: boolean; busy: boolean; syncing: boolean; onStart: () => Promise<void>; onMember: (action: 'remove' | 'leave', targetId?: string) => Promise<void>;
   onSave: (composition: Composition | null, minutes: number) => Promise<void>; onNotice: (message: string) => void;
 }) {
   const [qr, setQr] = useState('');
@@ -205,7 +237,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart }: {
     <div className="lobby-title"><div><div className="section-number">THE GATHERING</div><h1>今夜の待ち合わせ。</h1><p className="muted">みんなが集まるまで、ひと息。</p></div><span className={`status-pill ${syncing ? 'offline' : ''}`}><span className="dot"/>{preview ? 'プレビュー' : syncing ? '再接続を待っています' : '参加を受付中'}</span></div>
     <div className="lobby-grid"><div className="lobby-main">
       <section className="panel"><div className="panel-heading"><h2>集まった仲間</h2><span><b>{count}</b> / 10人</span></div><div className="members">
-        {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span></div>)}
+        {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span>{isHost && !preview && member.id !== room.viewerId && <button className="member-remove" disabled={busy} aria-label={`${member.nickname}さんを待機室から削除`} onClick={() => void onMember('remove', member.id)}>削除</button>}</div>)}
         {count < 5 && <div className="empty-seat"><span>＋</span>あと{5 - count}人で、始められる人数になります。</div>}
       </div></section>
       <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '閉じる' : '設定を変更'}</button>}</div>
@@ -230,6 +262,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart }: {
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
       <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled={preview || busy || !isHost || count < 5 || !room.composition || Boolean(currentError)} onClick={() => void onStart()}>{busy ? '準備しています…' : isHost ? 'ゲームを開始する' : '主催者の開始を待っています'}</button><small>{preview ? 'プレビューではゲームを開始できません。' : '全員そろったら開始しましょう。開始後の新規参加はできません。'}</small></div>
     </aside></div>
+    {!preview && <div className="leave-area"><button className="secondary-button" disabled={busy} onClick={() => void onMember('leave')}>部屋から退出する</button><p>退出すると参加者一覧から名前が消えます。招待コードで再参加できます。</p></div>}
     <div className="lobby-bottom"><span>◌</span><p>画面を閉じても、同じブラウザから席に戻れます。<br/><small>接続が切れても、すぐに脱落することはありません。</small></p></div>
   </div>;
 }
