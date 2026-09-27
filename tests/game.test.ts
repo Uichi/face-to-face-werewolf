@@ -35,7 +35,7 @@ function toNight(f: ReturnType<typeof fixture>) {
   const votes = Object.fromEntries(f.game.players.map(p => [p.id, p.id === 'v2' ? 'v1' : 'v2']));
   f.vote(votes);
   assert.equal(f.game.phase, 'execution');
-  f.send('v0', { type: 'next' });
+  f.confirmAll();
   assert.equal(f.game.phase, 'night');
 }
 
@@ -92,8 +92,8 @@ test('同票→決選で候補者も投票し自己投票不可、再同票な�
   f.vote({ v0: 'v1', v1: 'v0', v2: 'v0', w: 'v1', s: 'v0' });
   assert.equal(f.game.phase, 'execution');
   assert.equal(f.game.voteResult!.executedId, 'v0');
-  // A dead host retains progression rights.
-  f.send('v0', { type: 'next' }); assert.equal(f.game.phase, 'night');
+  // Dead players, including the host, are excluded from result confirmations.
+  f.confirmAll(); assert.equal(f.game.phase, 'night');
 
   const g = fixture(); g.day(); g.send('v0', { type: 'remove', targetId: 'v2' });
   g.send('v0', { type: 'startVote' });
@@ -113,7 +113,7 @@ test('夜は能力なしの確認も必要、最後の確認で60秒を待たず
   assert.equal(f.game.phase, 'morning');
   assert.equal(f.game.victimId, 'v1'); assert.equal(f.game.day, 2);
   assert.equal(viewFor(f.game, 's').private!.results.at(-1)!.isWolf, true);
-  f.send('v0', { type: 'next' }); assert.equal(f.game.phase, 'discussion');
+  f.confirmAll(); assert.equal(f.game.phase, 'discussion');
   f.send('v0', { type: 'startVote' });
   f.vote({ v0: 'w', w: 'v0', s: 'w' });
   assert.equal(f.game.winner, 'village');

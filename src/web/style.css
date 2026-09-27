@@ -20,3 +20,5 @@
 .result-exit{margin:0 28px 28px;text-align:center}.result-exit .secondary-button{width:100%}.game-screen .result-exit p{font-size:13px;color:#758076;margin:10px 0 0}@media(max-width:700px){.result-exit{margin:0 18px 22px}}
 
 .role-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.role-inputs{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:700px){.role-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.current-task{padding:22px 26px;border:1px solid #b9c9a6;border-left:5px solid #5c7748;border-radius:6px;background:#eaf0df}.current-task>span{font-size:12px;letter-spacing:.12em;font-weight:600;color:#53683e}.current-task h2{font-size:22px;line-height:1.6;margin:8px 0;color:#29452e}.game-screen .current-task p{margin:0;font-size:14px;line-height:1.8}.task-waiting{background:#eeefe9;border-color:#d2d6c9;border-left-color:#929c87}.task-waiting h2{color:#5d6955}.result-confirm{padding-top:10px}.game-screen .result-confirm p{font-size:14px}.night-task{padding:12px;background:#eaf0df;border-radius:4px}@media(max-width:700px){.current-task{padding:18px}.current-task h2{font-size:20px}}

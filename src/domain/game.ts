@@ -77,6 +77,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     enter(game, 'firstNight', now);
   } else if (game.phase === 'firstNight' && allDone(game)) {
     enter(game, 'discussion', now);
+  } else if (game.phase === 'execution' && allDone(game)) {
+    game.victimId = null; enter(game, 'night', now);
+  } else if (game.phase === 'morning' && allDone(game)) {
+    game.voteResult = null; enter(game, 'discussion', now);
   } else if (game.phase === 'discussion' && now >= game.deadline!) {
     enter(game, 'vote', now);
   } else if (['vote', 'runoff'].includes(game.phase) && allDone(game)) {
@@ -162,7 +166,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         break;
       }
       case 'confirm': {
-        check(['roles', 'firstNight', 'vote', 'runoff', 'night'].includes(game.phase), '確認する段階ではありません');
+        check(['roles', 'firstNight', 'vote', 'runoff', 'night', 'execution', 'morning'].includes(game.phase), '確認する段階ではありません');
         if (['vote', 'runoff'].includes(game.phase) || (game.phase === 'night' && hasAbility(actor))) {
           check(Object.hasOwn(game.selections, actor.id), '先に対象を選んでください');
         }
@@ -170,10 +174,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         break;
       }
       case 'next':
-        check(game.phase === 'execution' || game.phase === 'morning', '結果画面ではありません');
-        if (game.phase === 'execution') { game.victimId = null; enter(game, 'night', now); }
-        else { game.voteResult = null; enter(game, 'discussion', now); }
-        break;
+        throw new Error('結果は生存者全員の確認で進みます');
       case 'startVote':
         check(game.phase === 'discussion', '議論中ではありません');
         game.voteResult = null;
@@ -215,6 +216,7 @@ export function viewFor(game: Game, viewerId: string) {
   const isFinished = game.phase === 'finished';
   const canSeePrivate = viewer.alive && !isFinished;
   const publicInfo = {
+    resultConfirmation: true,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role } : {}) })),
