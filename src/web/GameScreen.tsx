@@ -22,7 +22,7 @@ const roleDetails: Record<Role, string> = {
  knight: 'あなたは村側です。夜に自分以外の1人を護衛します。同じ人を続けて護衛できます。',
 };
 
-export default function GameScreen({ room, onRoom, onHome }: { room: Room; onRoom: (room: Room) => void; onHome: () => void }) {
+export default function GameScreen({ room, onRoom, onHome, helpOpen = false }: { helpOpen?: boolean; room: Room; onRoom: (room: Room) => void; onHome: () => void }) {
  const [game, setGame] = useState<GameView | null>(null);
  const [error, setError] = useState('');
  const [offline, setOffline] = useState(false);
@@ -64,6 +64,7 @@ export default function GameScreen({ room, onRoom, onHome }: { room: Room; onRoo
    return () => { active.current = false; clearInterval(tick); clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
  }, [refresh, room.id]);
  useEffect(() => { setRevealed(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
+ useEffect(() => { if (helpOpen) setRevealed(false); }, [helpOpen]);
  useEffect(() => { if (!revealed) return; const timer=setTimeout(() => setRevealed(false), 20_000); return () => clearTimeout(timer); }, [revealed]);
 
  async function send(action: string, extra: Record<string, unknown> = {}, retry?: Pending) {

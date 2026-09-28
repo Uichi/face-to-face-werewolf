@@ -6,6 +6,7 @@ import type { Composition, Role } from '../domain/rules.ts';
 import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom, membership, resetPoints, RoomAccessLostError } from './api.ts';
 import type { Room } from './types.ts';
 import { roleNames } from './types.ts';
+import RulesHelp from './RulesHelp.tsx';
 import GameScreen from './GameScreen.tsx';
 import { gameCommand, GameError } from './game-api.ts';
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints } from '../domain/scoring.ts';
@@ -38,6 +39,7 @@ function Forest() {
 
 export default function App() {
   const [screen, setScreen] = useState<'home' | 'create' | 'join'>(inviteCode() ? 'join' : 'home');
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [preview, setPreview] = useState(false);
   const [nickname, setNickname] = useState('');
@@ -197,12 +199,12 @@ export default function App() {
   }
 
   return <div className="app">
-    <header className="site-header"><button className="brand" onClick={home} aria-label="夜のよりあい トップへ"><Moon small/><span>夜のよりあい</span></button><span className="header-note">集まって、話して、見抜こう。</span><span className="edition">対面人狼</span></header>
+    <header className="site-header"><button className="brand" onClick={home} aria-label="夜のよりあい トップへ"><Moon small/><span>夜のよりあい</span></button><span className="header-note">集まって、話して、見抜こう。</span><span className="edition">対面人狼</span><button className="rules-trigger" aria-haspopup="dialog" onClick={() => setRulesOpen(true)}>役職・ルール</button></header>
     <main>
       {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
-      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onResetPoints={clearPoints} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} room={room} onRoom={receiveRoom} onHome={home}/> : <>
+      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onResetPoints={clearPoints} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} helpOpen={rulesOpen} room={room} onRoom={receiveRoom} onHome={home}/> : <>
         {screen === 'home' ? <div className="home-grid">
           <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜13人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
@@ -228,6 +230,7 @@ export default function App() {
         <section className="promise"><Moon small/><p>ひみつはスマホに。会話は、この場で。</p><span>インストールも、専任の司会者もいりません。</span></section>
       </>}
     </main>
+    {rulesOpen && <RulesHelp settings={room ? { composition: room.composition, discussionMinutes: room.discussionMinutes, victoryPoints: room.victoryPoints, loverRole: room.loverRole } : undefined} onClose={() => setRulesOpen(false)}/>}
     <footer><span>夜のよりあい</span><span>友だちと囲む、小さな推理の時間。</span><small>開発中 · {room ? room.status === 'waiting' ? '待機室' : 'ゲーム' : 'はじめの一歩'}</small></footer>
   </div>;
 }

@@ -16,8 +16,8 @@ export function Scoreboard({ room, scores }: { room: Room; scores?: Score[] | nu
     })}
   </div>;
 }
-export function ScoringRules({ points }: { points: VictoryPoints }) {
-  return <details className="scoring-rules"><summary>ポイントのルール・配点を見る</summary>
+export function ScoringRules({ points, expanded = false }: { points: VictoryPoints; expanded?: boolean }) {
+  return <details className="scoring-rules" open={expanded}><summary>ポイントのルール・配点を見る</summary>
     <p>勝利点＋生存点＋貢献点を、試合終了時に加算します。</p>
     <dl className="victory-points">{(Object.keys(roleNames) as Role[]).filter(role => points[role] !== undefined).map(role => <div key={role}><dt>{roleNames[role]}</dt><dd>勝利で{points[role]}点</dd></div>)}</dl>
     <p><b>生存点：</b>初日を除き、夜を越えるたび＋1点（最大3点）。負けても獲得できます。</p>
