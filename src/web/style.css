@@ -73,3 +73,7 @@
 .rules-flow-list li::marker { color: #47633f; font-weight: 700; }
 .rules-help-body .scoring-rules { margin-top: 12px; }
 @media(max-width:700px) { .site-header { gap: 10px; } .site-header .edition { display: none; } .rules-trigger { margin-left: auto; padding: 8px 10px; font-size: 12px; } .rules-help-header { padding: 16px 16px 10px; } .rules-nav { padding: 8px 12px 12px; } .rules-help-body { padding: 12px 16px 24px; } .rules-role-card { padding: 14px; } }
+
+/* Preserve the entire portrait card, including its role title and border. */
+.role-art { display: block; width: min(100%, 240px); height: auto; aspect-ratio: 2 / 3; object-fit: contain; margin: 12px auto 18px; border-radius: 10px; }
+.role-art-compact { width: min(100%, 180px); margin: 0 auto 16px; }

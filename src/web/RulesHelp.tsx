@@ -1,3 +1,4 @@
+import RoleImage from './RoleImage.tsx';
 import { useEffect, useRef, useState } from 'react';
 import type { Composition, Role } from '../domain/rules.ts';
 import { DEFAULT_VICTORY_POINTS } from '../domain/scoring.ts';
@@ -37,7 +38,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
       {settings && <p className="rules-running-note">説明を開いている間も、ゲームと残り時間は進みます。</p>}
       {section === 'roles' && <section aria-labelledby="rules-roles-title"><h3 id="rules-roles-title">役職一覧</h3><p>村側は人狼を全員見つけ、人狼側は人間を減らすことを目指します。脱落しても、所属する陣営が勝てば勝利です。</p>
         <div className="rules-role-list">{roles.filter(item => item.role !== 'lover' || !settings || settings.loverRole).map(item => <article className="rules-role-card" key={item.role}>
-          <div className="rules-role-heading"><h4>{roleNames[item.role]}</h4><span className={item.team === '人狼側' ? 'rules-team wolves' : 'rules-team'}>{item.team}</span>{settings?.composition && <span className="rules-role-count">今回 {settings.composition[item.role] ?? 0}人</span>}</div>
+          <RoleImage role={item.role} compact /><div className="rules-role-heading"><h4>{roleNames[item.role]}</h4><span className={item.team === '人狼側' ? 'rules-team wolves' : 'rules-team'}>{item.team}</span>{settings?.composition && <span className="rules-role-count">今回 {settings.composition[item.role] ?? 0}人</span>}</div>
           <p>{item.action}</p><p className="rules-role-notes">{item.notes}</p>
         </article>)}</div><p className="small-note">本人の役職や仲間の名前は、ゲーム画面の「あなただけの情報」で確認してください。</p>
       </section>}
