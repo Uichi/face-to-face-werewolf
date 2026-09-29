@@ -26,9 +26,11 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   const chosen = game.players.find(player => player.role === role)!;
   const mine = game.players.find(player => player.id === SOLO_VIEWER)!;
   [chosen.role, mine.role] = [mine.role, chosen.role];
+  chosen.initialRole = chosen.apparentRole = chosen.role;
+  mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, thiefRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -49,18 +51,22 @@ function run(session: SoloSession, actorId: string | null, action: Command['acti
 export function applySoloAction(session: SoloSession, action: string, payload: Record<string, unknown> = {}, actorId = SOLO_VIEWER): SoloSession {
   if (action === 'get') return session;
   if (action === 'rematch') return createSoloSession(session.game.players.find(player => player.id === SOLO_VIEWER)?.role ?? 'villager', session.game.players.length);
-  if (action === 'select') return run(session, actorId, { type: 'select', targetId: String(payload.targetId) });
+  if (action === 'select') {
+    const actor = session.game.players.find(player => player.id === actorId);
+    const wolfAtNight = session.game.phase === 'night' && (actor?.apparentRole ?? actor?.role) === 'wolf';
+    return run(session, actorId, { type: 'select', targetId: String(payload.targetId), ...(wolfAtNight ? { strength: Number(payload.strength ?? 2) as 1|2|3 } : {}) });
+  }
   if (action === 'remove') return run(session, actorId, { type: 'remove', targetId: String(payload.targetId) });
   if (['confirm', 'startVote', 'extend', 'next'].includes(action)) return run(session, actorId, { type: action } as Command['action']);
   throw new Error('この操作は試遊モードでは使えません。');
 }
 
-const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
+const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
 function targetFor(game: Game, actorId: string, preferredTargetId?: string): string {
   const actor = game.players.find(player => player.id === actorId)!;
   const candidates = game.players.filter(player => player.alive && player.id !== actorId
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))
-    && !(game.phase === 'night' && actor.role === 'wolf' && player.role === 'wolf'));
+  );
   if (preferredTargetId === NO_EXECUTION_ID && game.day === 1 && ['vote','runoff'].includes(game.phase)
     && (game.phase === 'vote' || game.runoffIds.includes(NO_EXECUTION_ID))) return NO_EXECUTION_ID;
   if (!candidates.length) throw new Error('選べる対象がいません。');
@@ -77,7 +83,7 @@ export function completeSoloPhase(session: SoloSession, includeViewer: boolean, 
     if (next.game.phaseId !== startingPhase || next.game.phase === 'finished') break;
     const actor = next.game.players.find(player => player.id === actorId)!;
     if (next.game.confirmed.includes(actorId)) continue;
-    if (needsSelection(actor.role, next.game.phase) && !Object.hasOwn(next.game.selections, actorId)) next = applySoloAction(next, 'select', { targetId: targetFor(next.game, actorId, preferredTargetId) }, actorId);
+    if (needsSelection(actor.apparentRole ?? actor.role, next.game.phase) && !Object.hasOwn(next.game.selections, actorId)) next = applySoloAction(next, 'select', { targetId: targetFor(next.game, actorId, preferredTargetId), ...((actor.apparentRole ?? actor.role) === 'wolf' && next.game.phase === 'night' ? { strength: (Math.floor(Math.random()*3)+1) as 1|2|3 } : {}) }, actorId);
     next = applySoloAction(next, 'confirm', {}, actorId);
   }
   return next;

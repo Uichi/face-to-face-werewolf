@@ -5,7 +5,7 @@ import { roleNames } from './types.ts';
 import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
-const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker'];
+const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief'];
 const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', finished: '試合終了' } as const;
 
 export default function SoloTest({ onExit }: { onExit: () => void }) {

@@ -68,9 +68,9 @@ test('未操作、自己投票、二重投票、死者・決選候補外への�
   assert.throws(() => resolveVote(players, votes.filter(v => v.actorId !== '1')));
 });
 
-test('人狼の不一致は重複を除いた襲撃候補から選ぶ', () => {
+test('人狼の希望度を対象別に合計し、同点だけ無作為に選ぶ', () => {
   const players = make(['wolf', 'wolf', 'wolf', 'villager', 'villager', 'villager', 'villager']);
-  const actions = { attacks: choose(['3', '3', '4']), divination: null, protection: null };
+  const actions = { attacks: [{actorId:'0',targetId:'3',strength:1 as const},{actorId:'1',targetId:'3',strength:1 as const},{actorId:'2',targetId:'4',strength:2 as const}], divination: null, protection: null };
   for (let index = 0; index < 2; index++) {
     const result = resolveNight(players, actions, max => { assert.equal(max, 2); return index; });
     assert.equal(result.victimId, String(index + 3));

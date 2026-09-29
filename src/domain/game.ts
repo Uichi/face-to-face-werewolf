@@ -1,5 +1,5 @@
 // Trusted server state. Clients must receive viewFor(), never Game directly.
-import { assignRoles, eliminate, getWinner, initialWhite, NO_EXECUTION_ID, resolveNight, resolveVote, teamOf } from './rules.ts';
+import { assignRoles, eliminate, getWinner, NO_EXECUTION_ID, resolveNight, resolveVote, roles, teamOf } from './rules.ts';
 import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules.ts';
 
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
@@ -11,7 +11,7 @@ export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 
 type Secret = { recipientId: string; targetId: string; isWolf: boolean; kind: 'initial' | 'seer' | 'medium'; day: number };
 type Action =
   | { type: 'confirm' }
-  | { type: 'select'; targetId: string }
+  | { type: 'select'; targetId: string; strength?: 1 | 2 | 3 }
   | { type: 'next' }
   | { type: 'startVote' }
   | { type: 'extend' }
@@ -29,6 +29,7 @@ export type Game = {
   id: string; hostId: string; players: Player[]; phase: Phase; phaseId: number;
   day: number; discussionMs: number; deadline: number | null; lastTime: number;
   selections: Record<string, string>; confirmed: string[]; runoffIds: string[];
+  attackStrengths: Record<string, 1 | 2 | 3>;
   voteResult: VoteResult | null; victimId: string | null; winner: Team | null;
   scoring?: Scoring; scores?: Score[];
   lastElimination?: Elimination | null;
@@ -42,12 +43,14 @@ function check(condition: unknown, message: string): asserts condition {
 }
 const alive = (game: Game) => game.players.filter(p => p.alive);
 const allDone = (game: Game) => alive(game).every(p => game.confirmed.includes(p.id));
-const hasAbility = (p: Player) => ['wolf', 'seer', 'knight'].includes(p.role);
+const shownRole = (p: Player) => p.decoy ? (p.apparentRole ?? p.initialRole ?? p.role) : p.role;
+const hasAbility = (p: Player) => ['wolf', 'seer', 'knight'].includes(shownRole(p));
 
 function enter(game: Game, phase: Phase, now: number): void {
   game.phase = phase;
   game.phaseId++;
   game.selections = {};
+  game.attackStrengths = {};
   game.confirmed = [];
   game.runoffIds = [];
   game.deadline = phase === 'discussion' ? now + game.discussionMs
@@ -76,15 +79,26 @@ export function createGame(input: {
   return {
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
-    selections: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
+    selections: {}, attackStrengths: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
     scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], publicLog: [], receipts: {},
   };
 }
 
 function settle(game: Game, now: number, random: RandomIndex): void {
   if (game.phase === 'roles' && allDone(game)) {
-    const white = initialWhite(game.players, random);
-    if (white) game.secrets.push({ recipientId: white.seerId, targetId: white.targetId, isWolf: false, kind: 'initial', day: 1 });
+    const thief = game.players.find(p => p.alive && p.role === 'thief');
+    if (thief) {
+      const targetId = game.selections[thief.id];
+      const target = game.players.find(p => p.alive && p.id === targetId && p.id !== thief.id);
+      check(target, '怪盗の対象が不正です');
+      const stolenRole = target.role;
+      thief.role = stolenRole;
+      thief.apparentRole = stolenRole;
+      target.role = 'villager';
+      // The target keeps seeing and operating the role they received at the start.
+      target.apparentRole = target.initialRole ?? stolenRole;
+      target.decoy = true;
+    }
     enter(game, 'firstNight', now);
   } else if (game.phase === 'firstNight' && allDone(game)) {
     enter(game, 'discussion', now);
@@ -115,6 +129,9 @@ function settle(game: Game, now: number, random: RandomIndex): void {
           recipientId: death.mediumResult.mediumId, targetId: result.executedId,
           isWolf: death.mediumResult.isWolf, kind: 'medium', day: game.day,
         });
+        for (const p of alive(game).filter(p => shownRole(p) === 'medium' && p.role !== 'medium')) {
+          game.secrets.push({ recipientId: p.id, targetId: result.executedId, isWolf: false, kind: 'medium', day: game.day });
+        }
       } else (game.publicLog??=[]).push({ id: `no-execution-${game.phaseId}`, day: game.day, kind: 'noExecution' });
       if (!finishIfWon(game, now)) enter(game, 'execution', now);
     }
@@ -124,7 +141,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     const seer = living.find(p => p.role === 'seer');
     const knight = living.find(p => p.role === 'knight');
     const result = resolveNight(game.players, {
-      attacks: living.filter(p => p.role === 'wolf').map(actionOf),
+      attacks: living.filter(p => p.role === 'wolf').map(p => ({ ...actionOf(p), strength: game.attackStrengths[p.id]! })),
       divination: seer ? actionOf(seer) : null,
       protection: knight ? actionOf(knight) : null,
     }, random);
@@ -141,6 +158,9 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       recipientId: result.divination.seerId, targetId: result.divination.targetId,
       isWolf: result.divination.isWolf, kind: 'seer', day: game.day,
     });
+    for (const p of living.filter(p => shownRole(p) === 'seer' && p.role !== 'seer')) {
+      game.secrets.push({ recipientId: p.id, targetId: game.selections[p.id]!, isWolf: false, kind: 'seer', day: game.day });
+    }
     game.day++;
     if (!finishIfWon(game, now)) enter(game, 'morning', now);
   }
@@ -161,6 +181,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
   check(command.phaseId === previous.phaseId, '古い段階の操作です');
   check(previous.phase !== 'finished', '試合は終了しています');
   const game = structuredClone(previous);
+  game.attackStrengths ??= {};
   const { action, actorId } = command;
   const actor = game.players.find(p => p.id === actorId);
   if (action.type === 'tick') {
@@ -174,16 +195,20 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
     }
     switch (action.type) {
       case 'select': {
-        check(['vote', 'runoff', 'night'].includes(game.phase), '対象を選べる段階ではありません');
+        check(['roles', 'vote', 'runoff', 'night'].includes(game.phase), '対象を選べる段階ではありません');
         check(!game.confirmed.includes(actor.id), '確定済みです');
-        const noExecution = action.targetId === NO_EXECUTION_ID && game.day === 1 && game.phase !== 'night';
+        const noExecution = action.targetId === NO_EXECUTION_ID && game.day === 1 && !['roles', 'night'].includes(game.phase);
         const target = game.players.find(p => p.id === action.targetId && p.alive);
         check(noExecution || (target && target.id !== actor.id), '対象が不正です');
+        if (game.phase === 'roles') check(shownRole(actor) === 'thief' && target, '怪盗だけが交換相手を選べます');
         if (game.phase === 'runoff') check(game.runoffIds.includes(action.targetId), '決選候補ではありません');
         if (game.phase === 'night') {
           check(target, '対象が不正です');
           check(hasAbility(actor), '選択する能力がありません');
-          if (actor.role === 'wolf') check(target.role !== 'wolf', '人狼は襲撃できません');
+          if (shownRole(actor) === 'wolf') {
+            check(action.strength === undefined || [1, 2, 3].includes(action.strength), '襲撃の希望度を選んでください');
+            game.attackStrengths[actor.id] = action.strength ?? 2;
+          }
         }
         // Define own properties even for special identifiers such as __proto__.
         Object.defineProperty(game.selections, actor.id, { value: action.targetId, enumerable: true, writable: true, configurable: true });
@@ -191,7 +216,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
       }
       case 'confirm': {
         check(['roles', 'firstNight', 'vote', 'runoff', 'night', 'execution', 'morning'].includes(game.phase), '確認する段階ではありません');
-        if (['vote', 'runoff'].includes(game.phase) || (game.phase === 'night' && hasAbility(actor))) {
+        if ((game.phase === 'roles' && shownRole(actor) === 'thief') || ['vote', 'runoff'].includes(game.phase) || (game.phase === 'night' && hasAbility(actor))) {
           check(Object.hasOwn(game.selections, actor.id), '先に対象を選んでください');
         }
         if (!game.confirmed.includes(actor.id)) game.confirmed.push(actor.id);
@@ -222,6 +247,9 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
             // Preserve existing confirmations/white information, invalidate in-flight commands.
             game.phaseId++;
             game.confirmed = game.confirmed.filter(id => alive(game).some(p => p.id === id));
+            if (game.phase === 'roles' && Object.values(game.selections).includes(action.targetId)) {
+              for (const [id, selected] of Object.entries(game.selections)) if (selected === action.targetId) { delete game.selections[id]; game.confirmed = game.confirmed.filter(done => done !== id); }
+            }
           }
         }
         break;
@@ -244,8 +272,8 @@ export function viewFor(game: Game, viewerId: string) {
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner,
-    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role } : {}) })),
-    composition: Object.fromEntries(['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker'].map(role => [role, game.players.filter(p => p.role === role).length])),
+    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role } : {}) })),
+    composition: Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
     breadDelivered: game.phase === 'morning' && game.players.some(p => p.alive && p.role === 'baker'),
     completedCount: game.confirmed.filter(id => alive(game).some(p => p.id === id)).length,
     requiredCount: alive(game).length,
@@ -258,15 +286,17 @@ export function viewFor(game: Game, viewerId: string) {
   if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null };
   return {
     public: publicInfo,
-    private: { role: viewer.role, loverId: viewer.role === 'lover' ? game.players.find(p => p.role === 'lover' && p.id !== viewerId)?.id ?? null : null, confirmed: game.confirmed.includes(viewerId),
+    private: { role: shownRole(viewer), actualRole: game.phase === 'firstNight' && viewer.initialRole === 'thief' ? viewer.role : undefined,
+      loverId: shownRole(viewer) === 'lover' ? (viewer.initialRole === 'lover'
+        ? game.players.find(p => p.initialRole === 'lover' && p.id !== viewerId)?.id ?? null
+        : game.players.find(p => p.role === 'lover' && p.id !== viewerId)?.id ?? null) : null, confirmed: game.confirmed.includes(viewerId),
       selection: Object.hasOwn(game.selections, viewerId) ? game.selections[viewerId] : null,
+      attackStrength: game.attackStrengths[viewerId] ?? null,
       results: structuredClone(game.secrets.filter(s => s.recipientId === viewerId)),
     },
-    wolves: viewer.role === 'wolf' ? {
-      memberIds: game.players.filter(p => p.role === 'wolf').map(p => p.id),
-      selections: game.phase === 'night' ? alive(game).filter(p => p.role === 'wolf').map(p => ({
-        actorId: p.id, targetId: Object.hasOwn(game.selections, p.id) ? game.selections[p.id] : null,
-      })) : [],
+    wolves: shownRole(viewer) === 'wolf' ? {
+      memberIds: game.players.filter(p => viewer.initialRole === 'wolf' ? p.initialRole === 'wolf' : p.role === 'wolf').map(p => p.id),
+      selections: [] as { actorId: string; targetId: string | null }[],
     } : null,
   };
 }

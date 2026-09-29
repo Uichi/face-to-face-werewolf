@@ -39,14 +39,14 @@ function toNight(f: ReturnType<typeof fixture>) {
   assert.equal(f.game.phase, 'night');
 }
 
-test('全員の役職確認→初夜→全員確認で即座に昼、白通知は占い師だけ', () => {
+test('全員の役職確認→初夜→全員確認で即座に昼、初夜の白通知はない', () => {
   const f = fixture();
   assert.equal(f.game.phase, 'roles');
   assert.equal(viewFor(f.game, 's').private!.results.length, 0);
   f.confirmAll();
   assert.equal(f.game.phase, 'firstNight');
   assert.equal(f.game.deadline, null);
-  assert.deepEqual(viewFor(f.game, 's').private!.results.map(r => r.targetId), ['v0']);
+  assert.deepEqual(viewFor(f.game, 's').private!.results, []);
   assert.equal(viewFor(f.game, 'v0').private!.results.length, 0);
   f.confirmAll();
   assert.equal(f.game.phase, 'discussion');
@@ -230,10 +230,10 @@ test('二重送信は段階が進んだ後でも無変更、ID使い回し・別
   assert.throws(() => f.send('v0', { type: 'tick' }));
 });
 
-test('生存人狼のみ仲間の選択を見られ、脱落者・主催者へ秘密情報を渡さない', () => {
+test('人狼の選択は仲間にも隠し、脱落者・主催者へ秘密情報を渡さない', () => {
   const f = fixture(8); toNight(f);
   f.send('w0', { type: 'select', targetId: 'v1' });
-  assert.equal(viewFor(f.game, 'w1').wolves!.selections.find(s => s.actorId === 'w0')!.targetId, 'v1');
+  assert.deepEqual(viewFor(f.game, 'w1').wolves!.selections, []);
   assert.equal(viewFor(f.game, 'v0').wolves, null);
   assert.equal(viewFor(f.game, 'v0').public.players.some(p => 'role' in p), false);
   assert.equal(viewFor(f.game, 'v2').private, null);

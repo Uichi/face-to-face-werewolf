@@ -7,16 +7,17 @@ import { roleNames } from './types.ts';
 import { ScoringRules } from './Points.tsx';
 
 // Accept public settings only. Player identities, role assignments and actions never enter this component.
-export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean };
+export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean };
 const roles: { role: Role; team: string; action: string; notes: string }[] = [
   { role: 'villager', team: '村側', action: '会話と投票で、人狼を見つけましょう。', notes: '特別な能力はありません。夜も「あなただけの情報」を開き、確認を完了します。' },
-  { role: 'wolf', team: '人狼側', action: '仲間の人狼を確認でき、夜に人狼以外の生存者1人を襲撃します。', notes: '対象を選んで確定します。全員の確定後、襲撃先が違えば選ばれた異なる対象の中から同じ確率で1人に決まります。狂人の正体は分からず、襲撃してしまうこともあります。' },
-  { role: 'seer', team: '村側', action: '夜に自分以外の生存者1人を選び、人狼かどうか調べます。', notes: '対象を選んで確定します。同じ人を再び占えます。初夜は対象を選ばず、人狼ではない1人が通知されます。この白通知には狂人も含まれます。結果は本人だけが確認できます。' },
+  { role: 'wolf', team: '人狼側', action: '夜に自分以外の生存者1人と希望度1〜3を選びます。', notes: '仲間も対象にできます。対象別の希望度合計が最大の人を襲撃し、同点なら無作為に決まります。仲間への襲撃も成立します。他の人狼の選択や集計は表示されません。' },
+  { role: 'seer', team: '村側', action: '夜に自分以外の生存者1人を選び、人狼かどうか調べます。', notes: '対象を選んで確定します。同じ人を再び占えます。初夜の白通知はありません。結果は本人だけが確認できます。' },
   { role: 'medium', team: '村側', action: '処刑された人が人狼かどうか、処刑後に分かります。', notes: '対象を選ぶ操作はありません。処刑なし・襲撃・途中退場・後追いでは霊媒結果は出ません。結果は本人だけに表示され、夜は確認を完了します。' },
   { role: 'knight', team: '村側', action: '夜に自分以外の生存者1人を護衛します。', notes: '対象を選んで確定します。同じ人を連続して護衛できます。襲撃先と一致すれば犠牲者は出ません。護衛成功の理由や対象は公開されません。初夜は護衛しません。' },
   { role: 'madman', team: '人狼側', action: '人狼を助ける、人間の役職です。人狼側が勝てば狂人も勝利します。', notes: '人狼と互いの正体は分かりません。占い・霊媒では「人狼ではない」と出ます。勝敗判定の人数では人間として数えます。夜の能力はなく、確認だけ行います。' },
   { role: 'lover', team: '村側', action: '2人セットの独立した役職で、お互いが誰か分かります。', notes: '片方が処刑・襲撃・途中退場で脱落すると、もう片方も後追いで脱落します。襲撃対象への護衛が成功すれば2人とも生存しますが、相方だけの護衛では後追いを防げません。占い・霊媒は白。夜は確認のみで、村側の勝利を目指します。' },
   { role: 'baker', team: '村側', action: '生存している朝に、全員へパンが届きます。', notes: 'パン屋の名前は公開されません。パン屋を含む配役でパンが届かなくなった場合、パン屋はすでに脱落しています。占い・霊媒は白で、夜は確認のみです。' },
+  { role: 'thief', team: '村側', action: '役職確認時に1人を選び、その人の役職を奪います。', notes: '役職・陣営・能力・勝利条件・得点条件が移ります。奪われた人は実際には村人になりますが、終了まで元の役職が表示され、能力操作も偽装されます。交換を知るのは怪盗だけです。' },
 ];
 const sections = [{ id: 'roles', label: '役職' }, { id: 'flow', label: '進め方' }, { id: 'points', label: 'ポイント' }, { id: 'trouble', label: '困ったとき' }] as const;
 type Section = typeof sections[number]['id'];
@@ -46,7 +47,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
       {section === 'flow' && <section aria-labelledby="rules-flow-title"><h3 id="rules-flow-title">ゲームの進め方</h3>
         <ol className="rules-flow-list">
           <li><h4>役職を確認する</h4><p>自分の役職を確認し、「役職を確認しました」を押します。生存者全員の確認で初夜へ進みます。</p></li>
-          <li><h4>初夜の確認</h4><p>襲撃・護衛はありません。占い師には白通知が届きます。全員が自分の情報を確認して、夜の確認を完了します。</p></li>
+          <li><h4>初夜の確認</h4><p>襲撃・護衛・占いはありません。怪盗は交換後の役職を確認します。全員が自分の情報を確認して、夜の確認を完了します。</p></li>
           <li><h4>昼の議論</h4><p>スマホから顔を上げて話し合います。議論は{settings?.discussionMinutes ?? 3}分{settings ? '（この部屋の設定）' : 'が初期値'}です。主催者は60秒ずつ延長したり、確認操作を挟んで早めに投票へ進めたりできます。</p></li>
           <li><h4>投票・処刑</h4><p>自分以外の生存者1人を選び、投票を確定します。棄権はできません。全員の確定で集計し、最多得票者を処刑します。確定前は選び直せますが、確定後は変更できません。</p><p>最多が同票なら候補者だけを対象に1回決選投票します。候補者本人も投票し、自己投票は禁止です。決選も同票なら処刑しません。公開されるのは得票数だけです。</p></li>
           <li><h4>結果の確認・夜の行動</h4><p>処刑結果は生存者全員の確認で進みます。夜の能力者は「対象選択 → 確定」、能力のない人も夜の確認を完了します。全員完了で、残り時間を待たずに夜を処理します。</p></li>
