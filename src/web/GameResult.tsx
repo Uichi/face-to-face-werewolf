@@ -18,17 +18,24 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   const ending = game.ending;
   const lastPlayer = ending && game.players.find(p => p.id === ending.playerId);
   const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : '途中脱落しました';
+  const finalVotes = ending?.cause === 'execution' && game.voteResult?.executedId === ending.playerId
+    ? game.voteResult.counts[ending.playerId] ?? 0 : null;
+  const finalVoteRows = finalVotes === null ? [] : Object.entries(game.voteResult!.counts).sort(([aId, a], [bId, b]) =>
+    b - a || room.members.findIndex(member => member.id === aId) - room.members.findIndex(member => member.id === bId));
+  const finalEventText = ending ? `${name(ending.playerId)}さんが${finalVotes === null ? verb : `${finalVotes}票で処刑`}` : '試合終了';
   return <section className={`panel result-panel ${villageWins ? 'village-wins' : 'wolves-win'}`} aria-labelledby="winner-title">
     {ending && <div className="final-event" id="final-event">
       <div className="section-number">最後の出来事 · {ending.day}日目{ending.cause === 'attack' ? 'の夜' : ''}</div>
-      <p className="final-person"><strong>{name(ending.playerId)}</strong>さんが<br/>{verb}</p>
+      <p className="final-person"><strong>{name(ending.playerId)}</strong>さんが<br/>{finalVotes === null ? verb : <><b>{finalVotes}票</b>で処刑されました</>}</p>
       {ending.followedIds?.map(id=><p key={id} className="final-followed"><strong>{name(id)}</strong>さんも後追いで脱落しました。</p>)}
       {lastPlayer?.role && <span className="final-role">役職：{roleNames[lastPlayer.role]}</span>}
+      {finalVoteRows.length > 0 && <div className="final-vote-counts"><h3>最後の投票結果</h3>{finalVoteRows.map(([id, votes])=><div className={id === ending.playerId ? 'executed' : ''} key={id}><span>{name(id)}{id === ending.playerId && <small>処刑</small>}</span><b>{votes}票</b></div>)}<p>誰が誰に投票したかは公開しません。</p></div>}
     </div>}
     <div className="victory-summary">
       <div className="section-number">{ending ? 'これにより、決着' : '試合の結果'}</div>
       <h2 id="winner-title" ref={heading} tabIndex={-1} aria-describedby={ending ? 'final-event victory-reason' : 'victory-reason'}>{villageWins ? '村側' : '人狼側'}<span>の勝利！</span></h2>
-      <p id="victory-reason">{villageWins ? '生存している人狼がいなくなりました。' : '生存している人狼が、人間（狂人を含む）と同数以上になりました。'}</p>
+      {ending && <div className="decision-flow" aria-label="勝敗が決まった流れ"><div><small>最後の出来事</small><strong>{finalEventText}</strong></div><span aria-hidden="true">↓</span><div><small>処理後の人数</small><strong>人狼 {wolves}人 ／ 人間 {villagers}人</strong></div><span aria-hidden="true">↓</span><div className="decision-winner"><small>勝敗判定</small><strong>{villageWins ? '村側' : '人狼側'}の勝利</strong></div></div>}
+      <p id="victory-reason">{villageWins ? '生存している人狼が0人になったため、村側の勝利です。' : `生存人狼${wolves}人が、生存人間${villagers}人と同数以上になったため、人狼側の勝利です。`}</p>
       <div className="final-counts"><span>生存人狼 <b>{wolves}人</b></span><span>生存人間 <b>{villagers}人</b></span></div>
       <p className="your-result">{selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
     </div>
