@@ -21,6 +21,7 @@
 - `supabase/migrations/`: 部屋・参加者・設定・閲覧制限・主催者移行・ゲーム進行
 - `tests/lobby.test.ts`: PGliteでのSQLと権限の検証
 - [Supabaseの設定手順](docs/supabase-setup.md)
+- [サイト共通パスワードの設定手順](docs/site-password-setup.md)
 
 ## 画面の起動
 

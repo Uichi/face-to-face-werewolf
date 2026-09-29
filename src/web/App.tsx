@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import QRCode from 'qrcode';
 import { DEFAULT_COMPOSITIONS, validateComposition } from '../domain/rules.ts';
 import type { Composition, Role } from '../domain/rules.ts';
-import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom, membership, resetPoints, RoomAccessLostError } from './api.ts';
+import { captchaSiteKey, configured, ensureSession, hasSession, lobby, watchRoom, membership, resetPoints, RoomAccessLostError, SITE_ACCESS_REQUIRED_EVENT, siteAccessStatus } from './api.ts';
 import type { Room } from './types.ts';
 import { roleNames } from './types.ts';
 import RulesHelp from './RulesHelp.tsx';
@@ -14,6 +14,7 @@ import type { VictoryPoints } from '../domain/scoring.ts';
 import { Scoreboard, ScoringRules } from './Points.tsx';
 import Turnstile from './Turnstile.tsx';
 import { invitationUrl, requestId as newRequestId } from './invite.ts';
+import AccessGate from './AccessGate.tsx';
 
 const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
@@ -38,6 +39,8 @@ function Forest() {
 }
 
 export default function App() {
+  const [access, setAccess] = useState<'checking' | 'locked' | 'unlocked' | 'error'>(configured ? 'checking' : 'unlocked');
+  const [accessMessage, setAccessMessage] = useState('');
   const [screen, setScreen] = useState<'home' | 'create' | 'join'>(inviteCode() ? 'join' : 'home');
   const [rulesOpen, setRulesOpen] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
@@ -64,6 +67,20 @@ export default function App() {
   const needsCaptcha = configured && Boolean(captchaSiteKey) && !sessionExists;
 
   useEffect(() => { void hasSession().then(setSessionExists).catch(() => {}); }, []);
+  const checkAccess = useCallback(async () => {
+    if (!configured) { setAccess('unlocked'); return; }
+    setAccess('checking'); setAccessMessage('');
+    try {
+      const state = await siteAccessStatus();
+      setAccess(!state.enabled || state.unlocked ? 'unlocked' : 'locked');
+    } catch (cause) { setAccess('error'); setAccessMessage((cause as Error).message); }
+  }, []);
+  useEffect(() => { void checkAccess(); }, [checkAccess]);
+  useEffect(() => {
+    const locked = () => setAccess('locked');
+    window.addEventListener(SITE_ACCESS_REQUIRED_EVENT, locked);
+    return () => window.removeEventListener(SITE_ACCESS_REQUIRED_EVENT, locked);
+  }, []);
   useEffect(() => {
     if (new URLSearchParams(location.search).has('preview')) { setPreview(true); setRoom(demoRoom()); }
   }, []);
@@ -82,13 +99,13 @@ export default function App() {
     finally { setBusy(false); operation.current = false; }
   }, [clearSavedRoom]);
   useEffect(() => {
-    if (configured && savedRoom && !inviteCode() && !new URLSearchParams(location.search).has('preview')) void resume(savedRoom, true);
+    if (access === 'unlocked' && configured && savedRoom && !inviteCode() && !new URLSearchParams(location.search).has('preview')) void resume(savedRoom, true);
     // The mount restore must not run again after a user chooses another screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resume]);
+  }, [resume, access]);
 
   useEffect(() => {
-    if (!room || preview) return;
+    if (access !== 'unlocked' || !room || preview) return;
     const id = room.id; let disposed = false; let loading = false;
     const refresh = async () => {
       if (loading || document.visibilityState === 'hidden') return;
@@ -112,7 +129,7 @@ export default function App() {
     window.addEventListener('online', visible); document.addEventListener('visibilitychange', visible);
     void refresh();
     return () => { disposed = true; stop(); clearInterval(timer); window.removeEventListener('online', visible); document.removeEventListener('visibilitychange', visible); };
-  }, [room?.id, preview, clearSavedRoom]);
+  }, [room?.id, preview, clearSavedRoom, access]);
 
   async function enterRoom(event: FormEvent) {
     event.preventDefault(); if (operation.current) return;
@@ -197,6 +214,10 @@ export default function App() {
       if (!(e instanceof GameError && e.retryable)) startRequest.current = null;
     } finally { operation.current = false; setBusy(false); }
   }
+
+  if (access === 'checking') return <main className="access-gate"><section className="access-card access-loading" aria-live="polite"><div className="access-mark" aria-hidden="true">☾</div><p>入口を確認しています…</p></section></main>;
+  if (access === 'error') return <main className="access-gate"><section className="access-card"><div className="access-mark" aria-hidden="true">☾</div><h1>入口を確認できませんでした</h1><div className="message error" role="alert">{accessMessage}</div><button className="primary" onClick={() => void checkAccess()}>もう一度確認する</button></section></main>;
+  if (access === 'locked') return <AccessGate needsCaptcha={needsCaptcha} onUnlocked={() => { setSessionExists(true); setAccess('unlocked'); }}/>;
 
   return <div className="app">
     <header className="site-header"><button className="brand" onClick={home} aria-label="夜のよりあい トップへ"><Moon small/><span>夜のよりあい</span></button><span className="header-note">集まって、話して、見抜こう。</span><span className="edition">対面人狼</span><button className="rules-trigger" aria-haspopup="dialog" onClick={() => setRulesOpen(true)}>役職・ルール</button></header>

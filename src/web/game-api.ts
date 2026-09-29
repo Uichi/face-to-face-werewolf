@@ -1,4 +1,4 @@
-import { client } from './api.ts';
+import { client, siteAccessError } from './api.ts';
 import type { Room } from './types.ts';
 import type { viewFor } from '../domain/game.ts';
 export type GameView = ReturnType<typeof viewFor>;
@@ -11,6 +11,7 @@ export async function gameCommand(action: string, payload: Record<string, unknow
   if (!client) throw new GameError('接続先が設定されていません。');
   const { data, error } = await client.rpc('game_command', { action, payload });
   if (error) {
+    const access = siteAccessError(error); if (access) throw new GameError(access.message);
     if (error.code === 'PGRST202') throw new GameError('ゲーム機能の接続準備中です。設定の追加後にページを更新してください。');
     if (error.code === 'P0001') throw new GameError(error.message);
     throw new GameError('通信を確認して、もう一度お試しください。', true);
