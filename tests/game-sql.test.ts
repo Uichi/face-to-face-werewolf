@@ -16,7 +16,10 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql','202609280010_points.sql','202609280010_points.sql','202609280011_lovers.sql','202609280011_lovers.sql']) await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql','202609280010_points.sql','202609280010_points.sql','202609280011_lovers.sql','202609280011_lovers.sql','202609290013_baker.sql','202609290013_baker.sql']) {
+   if(name==='202609290013_baker.sql')await db.exec("create or replace function app_private.assert_site_access() returns void language plpgsql as $$begin return;end$$");
+   await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
  async function user(id:string) { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec('set role authenticated'); }
  async function raw(name:string, action:string, payload:Record<string,unknown>) {
   const result=await db.query<{data:Response}>(`select public.${name}($1,$2::jsonb) data`,[action,JSON.stringify(payload)]);return result.rows[0]!.data;
@@ -223,7 +226,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
   });
   await t.test('採点: 勝敗確定・再送・再接続・再戦で一度だけ累計、非公開実績を返さない',async()=>{
    const f=await setup(8);let g=await f.state();
-   assert.deepEqual(g.scoring!.victoryPoints,{villager:5,wolf:6,seer:5,medium:5,knight:5,madman:6,lover:5});
+   assert.deepEqual(g.scoring!.victoryPoints,{villager:5,wolf:6,seer:5,medium:5,knight:5,madman:6,lover:5,baker:5});
    for(const p of g.players){const v=await f.call(p.id,'get');assert.equal(v.game!.public.scores,null);assert.ok(!JSON.stringify(v).includes('discovered'));assert.ok(!JSON.stringify(v).includes('"stats"'));assert.ok(v.room.members.every(m=>m.points===0));}
    const wolves=g.players.filter(p=>p.role==='wolf');
    const dead=g.players.find(p=>p.role==='villager')!;
@@ -250,7 +253,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    await user(f.memberUsers.get(other.id)!);await assert.rejects(raw('score_command','reset',{roomId:f.roomId,revision:waiting.room.revision}));
    assert.equal((await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{}})).ok,false);
    await user(f.users[0]!);
-   const points={villager:0,wolf:10,seer:3,medium:4,knight:2,madman:8,lover:5};
+   const points={villager:0,wolf:10,seer:3,medium:4,knight:2,madman:8,lover:5,baker:5};
    for(const value of [-1,11,1.5,'2',null])await assert.rejects(raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{...points,wolf:value}}));
    await assert.rejects(raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:{...points,extra:1}}));
    let updated=await raw('lobby_command','settings',{roomId:f.roomId,revision:waiting.room.revision,discussionMinutes:3,composition:null,victoryPoints:points});assert.equal(updated.ok,true);assert.deepEqual(updated.room.victoryPoints,points);
@@ -320,7 +323,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    }
    const victoryPoints={...wait.room.victoryPoints!,lover:7};
    wait=await raw('lobby_command','settings',{roomId:f.roomId,revision:wait.room.revision,discussionMinutes:3,composition:{villager:1,wolf:1,seer:1,medium:1,knight:1,madman:0,lover:2},victoryPoints});assert.equal(wait.ok,true);
-   await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/202609280011_lovers.sql',import.meta.url),'utf8'));await user(f.users[0]!);
+   await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/202609280011_lovers.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/202609290013_baker.sql',import.meta.url),'utf8'));await user(f.users[0]!);
    const kept=await raw('lobby_command','get',{roomId:f.roomId});assert.equal(kept.room.victoryPoints!.lover,7);assert.equal(kept.room.composition!.lover,2);
    const {lover:unused,...oldPoints}=victoryPoints;
    const old=await raw('lobby_command','settings',{roomId:f.roomId,revision:kept.room.revision,discussionMinutes:3,composition:{villager:3,wolf:1,seer:1,medium:1,knight:1,madman:0},victoryPoints:oldPoints});assert.equal(old.ok,true);assert.equal(old.room.composition!.lover,0);assert.equal(old.room.victoryPoints!.lover,7);
@@ -365,6 +368,19 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    const command={roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID()};const first=await raw('game_command','confirm',command);assert.equal(first.game!.public.phase,'finished');assert.equal(first.game!.public.winner,'wolves');assert.deepEqual(first.game!.public.ending!.followedIds,[b.id]);assert.equal(first.game!.public.ending!.playerId,a.id);
    assert.equal(first.game!.public.scores!.find(p=>p.playerId===a.id)!.total,0);assert.equal(first.game!.public.scores!.find(p=>p.playerId===b.id)!.total,0);assert.equal(first.game!.public.scores!.find(p=>p.playerId===w.id)!.survival,1);
    const retry=await raw('game_command','confirm',command);assert.deepEqual(retry.room.members,first.room.members);assert.deepEqual(retry.game,first.game);
+  });
+  await t.test('パン屋: 設定・配布・朝のパン通知・脱落後の通知なし',async()=>{
+   const f=await setup(5);let g=await f.state();await f.call(f.host,'remove',{targetId:g.players.find(p=>p.role==='wolf')!.id});
+   let wait=await f.call(f.host,'rematch');await user(f.users[0]!);
+   const composition={villager:2,wolf:1,seer:1,medium:0,knight:0,madman:0,lover:0,baker:1};
+   wait=await raw('lobby_command_baker','settings',{roomId:f.roomId,revision:wait.room.revision,discussionMinutes:3,composition,victoryPoints:wait.room.victoryPoints});
+   assert.equal(wait.room.bakerRole,true);assert.equal(wait.room.composition!.baker,1);assert.equal(wait.room.victoryPoints!.baker,5);
+   const started=await raw('game_command_baker','start',{roomId:f.roomId,revision:wait.room.revision,requestId:randomUUID()});
+   g=await f.state();assert.equal(g.players.filter(p=>p.role==='baker').length,1);assert.equal(started.game!.public.composition.baker,1);
+   g.phase='morning';g.phaseId+=1;g.confirmed=[];await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);await user(f.users[0]!);
+   let morning=await raw('game_command_baker','get',{roomId:f.roomId});assert.equal(morning.game!.public.breadDelivered,true);
+   g.players.find(p=>p.role==='baker')!.alive=false;await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);await user(f.users[0]!);
+   morning=await raw('game_command_baker','get',{roomId:f.roomId});assert.equal(morning.game!.public.breadDelivered,false);
   });
  }finally{await db.close();}
 });

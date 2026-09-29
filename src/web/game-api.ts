@@ -9,7 +9,8 @@ export class GameError extends Error {
 }
 export async function gameCommand(action: string, payload: Record<string, unknown>): Promise<GameResponse> {
   if (!client) throw new GameError('接続先が設定されていません。');
-  const { data, error } = await client.rpc('game_command', { action, payload });
+  let { data, error } = await client.rpc('game_command_baker', { action, payload });
+  if (error?.code === 'PGRST202' || error?.code === '42883') ({ data, error } = await client.rpc('game_command', { action, payload }));
   if (error) {
     const access = siteAccessError(error); if (access) throw new GameError(access.message);
     if (error.code === 'PGRST202') throw new GameError('ゲーム機能の接続準備中です。設定の追加後にページを更新してください。');

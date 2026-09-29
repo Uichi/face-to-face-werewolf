@@ -4,7 +4,7 @@ import { assignRoles, DEFAULT_COMPOSITIONS, eliminate, initialWhite, resolveNigh
 import type { Composition } from '../src/domain/rules.ts';
 import { applyCommand, createGame, viewFor } from '../src/domain/game.ts';
 import type { Game } from '../src/domain/game.ts';
-const composition:Composition={villager:1,wolf:1,seer:1,medium:1,knight:1,madman:0,lover:2};
+const composition:Composition={villager:1,wolf:1,seer:1,medium:1,knight:1,madman:0,lover:2,baker:0};
 function base(){return createGame({id:'lovers',hostId:'v',playerIds:['v','w','s','m','k','a','b'],composition},0,()=>0);}
 function settle(g:Game){g.confirmed=g.players.filter(p=>p.alive).map(p=>p.id);return applyCommand(g,{gameId:g.id,phaseId:g.phaseId,requestId:'tick-'+g.phaseId,actorId:null,action:{type:'tick'}},0,()=>0);}
 

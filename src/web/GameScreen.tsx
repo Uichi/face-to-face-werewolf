@@ -19,6 +19,7 @@ const roleDetails: Record<Role, string> = {
  seer: 'あなたは村側です。夜に自分以外の1人が人狼かどうかを調べられます。',
  medium: 'あなたは村側です。処刑された人が人狼かどうかを、処刑後に確認できます。',
  lover: 'あなたは村側の恋人です。もう1人の恋人を確認できます。片方が処刑・襲撃・途中退場で脱落すると、もう片方も後追いで脱落します。夜は確認だけ行います。',
+ baker: 'あなたは村側のパン屋です。生存している朝は、あなたが焼いたパンが全員に届きます。あなたの名前は公開されません。夜は確認だけ行います。',
  madman: 'あなたは人狼側の人間です。会話で人狼を助けましょう。人狼が誰かは分からず、人狼にもあなたの正体は分かりません。占い・霊媒では人狼ではないと出ます。夜は確認だけ行います。人数判定では人間として数えます。',
  knight: 'あなたは村側です。夜に自分以外の1人を護衛します。同じ人を続けて護衛できます。',
 };
@@ -129,7 +130,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>自分以外の生存者に投票します。確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
        {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
        {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:'同票のため、処刑はありません'}</h2><p>脱落した人の役職は、試合終了まで公開されません。</p></>}
-       {phase==='morning'&&<><h2>朝になりました</h2><div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>昨夜の犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div><p>結果を確認したら、次の議論に進みましょう。</p></>}
+       {phase==='morning'&&<><h2>朝になりました</h2><div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status"><span aria-hidden="true">{pub.breadDelivered?'🥖':'…'}</span><div><strong>{pub.breadDelivered?'パン屋から焼きたてのパンが届きました':'今日はパンが届きませんでした'}</strong><p>{pub.breadDelivered?'パン屋はまだ生存しています。誰なのかは公開されません。':'パン屋が配役にいないか、すでに脱落しています。'}</p></div></div><div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>昨夜の犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div><p>結果を確認したら、次の議論に進みましょう。</p></>}
        {resultPhase&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
        {resultPhase&&pub.resultConfirmation&&<div className="result-confirm"><p>生存者全員の確認で、自動的に次へ進みます。</p>{self.alive&&confirmButton}</div>}
        {(['roles','firstNight','vote','runoff','night'].includes(phase)||(resultPhase&&pub.resultConfirmation))&&<div className="completion"><span>操作完了</span><strong>{pub.completedCount} / {pub.requiredCount}人</strong><progress value={pub.completedCount} max={pub.requiredCount}/></div>}

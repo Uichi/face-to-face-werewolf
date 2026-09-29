@@ -4,7 +4,7 @@ import type { Role } from '../src/domain/rules.ts';
 import { completeSoloPhase, createCheckScenario, createEndingScenario, createSoloSession, SOLO_VIEWER, soloResponse } from '../src/web/solo-test.ts';
 
 test('ひとり試遊では選んだ役職が本人に割り当てられる', () => {
-  const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover'];
+  const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker'];
   for (const role of roles) {
     const session = createSoloSession(role);
     assert.equal(session.game.players.find(player => player.id === SOLO_VIEWER)?.role, role);

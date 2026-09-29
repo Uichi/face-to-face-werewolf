@@ -51,6 +51,10 @@ export async function ensureSession(captchaToken?: string) {
   return signingIn;
 }
 export class RoomAccessLostError extends Error {}
+function normalizeRoom(room: Room): Room {
+  if (room.victoryPoints?.baker === undefined) return room;
+  return { ...room, bakerRole: true, composition: room.composition ? { ...room.composition, baker: room.composition.baker ?? 0 } : room.composition };
+}
 export async function membership(action: 'remove' | 'leave', payload: Record<string, unknown>): Promise<{ room?: Room; left?: boolean }> {
   if (!client) throw new Error('接続先が設定されていません。');
   const { data, error } = await client.rpc('membership_command', { action, payload });
@@ -58,16 +62,18 @@ export async function membership(action: 'remove' | 'leave', payload: Record<str
   if (error?.code === 'PGRST202') throw new Error('参加者の整理機能は設定の追加待ちです。追加後にページを更新してください。');
   if (error) throw new Error(error.code === 'P0001' ? error.message : '通信を確認して、もう一度お試しください。');
   if (!data?.ok) throw new Error(data?.message || '操作を完了できませんでした。');
+  if (data.room) data.room = normalizeRoom(data.room as Room);
   return data;
 }
 export async function lobby(action: string, payload: Record<string, unknown>): Promise<Room> {
   if (!client) throw new Error('接続先が設定されていません。');
-  const { data, error } = await client.rpc('lobby_command', { action, payload });
+  let { data, error } = await client.rpc('lobby_command_baker', { action, payload });
+  if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command', { action, payload }));
   const access = siteAccessError(error); if (access) throw access;
   if (error) throw new Error('部屋に接続できませんでした。通信を確認して、もう一度お試しください。');
   if (data?.code === 'ROOM_ACCESS_LOST') throw new RoomAccessLostError(data.message);
   if (!data?.ok) throw new Error(data?.message || '操作を完了できませんでした。');
-  return data.room as Room;
+  return normalizeRoom(data.room as Room);
 }
 
 let subscriptionId = 0;
@@ -85,5 +91,5 @@ export async function resetPoints(payload: Record<string, unknown>): Promise<Roo
   const access = siteAccessError(error); if (access) throw access;
   if (error) throw new Error(error.code === 'P0001' ? error.message : '通信を確認して、もう一度お試しください。');
   if (!data?.ok) throw new Error('ポイントをリセットできませんでした。');
-  return data.room as Room;
+  return normalizeRoom(data.room as Room);
 }

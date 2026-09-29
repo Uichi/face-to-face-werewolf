@@ -13,8 +13,8 @@ export type SoloSession = { game: Game; room: Room; now: number; sequence: numbe
 
 function compositionFor(role: Role): Composition {
   if (['villager', 'wolf', 'seer'].includes(role)) return { ...DEFAULT_COMPOSITIONS[5]! };
-  if (role === 'lover') return { villager: 1, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 2 };
-  return { villager: 2, wolf: 1, seer: 1, medium: role === 'medium' ? 1 : 0, knight: role === 'knight' ? 1 : 0, madman: role === 'madman' ? 1 : 0, lover: 0 };
+  if (role === 'lover') return { villager: 1, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 2, baker: 0 };
+  return { villager: 2, wolf: 1, seer: 1, medium: role === 'medium' ? 1 : 0, knight: role === 'knight' ? 1 : 0, madman: role === 'madman' ? 1 : 0, lover: 0, baker: role === 'baker' ? 1 : 0 };
 }
 
 export function createSoloSession(role: Role = 'villager'): SoloSession {
@@ -25,7 +25,7 @@ export function createSoloSession(role: Role = 'villager'): SoloSession {
   [chosen.role, mine.role] = [mine.role, chosen.role];
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: IDS.map((id, index) => ({ id, nickname: NAMES[index]!, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
