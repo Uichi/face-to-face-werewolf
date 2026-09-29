@@ -20,7 +20,9 @@ test('怪盗は確認時に選んだ役職を奪い、相手には元の役職�
   assert.equal(game.players.find(player => player.id === thief.id)!.role, 'seer');
   assert.equal(game.players.find(player => player.id === seer.id)!.role, 'villager');
   assert.equal(viewFor(game, thief.id).private!.role, 'seer');
+  assert.deepEqual(viewFor(game, thief.id).private!.thiefExchange, { targetId: seer.id, stolenRole: 'seer' });
   assert.equal(viewFor(game, seer.id).private!.role, 'seer');
+  assert.equal(viewFor(game, seer.id).private!.thiefExchange, null);
   assert.deepEqual(viewFor(game, thief.id).private!.results, []);
   assert.equal(viewFor(game, 'p0').public.players.some(player => 'role' in player), false);
 });

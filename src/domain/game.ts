@@ -287,6 +287,9 @@ export function viewFor(game: Game, viewerId: string) {
   return {
     public: publicInfo,
     private: { role: shownRole(viewer), actualRole: game.phase === 'firstNight' && viewer.initialRole === 'thief' ? viewer.role : undefined,
+      thiefExchange: viewer.initialRole === 'thief' && viewer.role !== 'thief' ? {
+        targetId: game.players.find(p => p.decoy)?.id ?? null, stolenRole: viewer.role,
+      } : null,
       loverId: shownRole(viewer) === 'lover' ? (viewer.initialRole === 'lover'
         ? game.players.find(p => p.initialRole === 'lover' && p.id !== viewerId)?.id ?? null
         : game.players.find(p => p.role === 'lover' && p.id !== viewerId)?.id ?? null) : null, confirmed: game.confirmed.includes(viewerId),

@@ -2,6 +2,8 @@
 
 SupabaseのSQL Editorで、`supabase/migrations/202609290016_thief.sql` を全体コピーして1回実行します。成功時は `Success. No rows returned` と表示されます。既存SQLやテーブルは削除しません。
 
+016をすでに適用済みの場合は、続けて `supabase/migrations/202609290017_thief_result.sql` を実行すると、怪盗本人に「誰から何の役職を奪ったか」が表示されます。
+
 適用後にページを再読み込みすると、待機室のカスタム配役に「怪盗」が表示されます。標準配役は怪盗0人のままです。
 
 怪盗画像は `public/images/roles/thief.png` を使用します。
