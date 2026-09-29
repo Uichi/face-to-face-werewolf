@@ -1,5 +1,5 @@
 // Trusted server state. Clients must receive viewFor(), never Game directly.
-import { assignRoles, eliminate, getWinner, initialWhite, resolveNight, resolveVote, teamOf } from './rules.ts';
+import { assignRoles, eliminate, getWinner, initialWhite, NO_EXECUTION_ID, resolveNight, resolveVote, teamOf } from './rules.ts';
 import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules.ts';
 
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
@@ -94,7 +94,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     enter(game, 'vote', now);
   } else if (['vote', 'runoff'].includes(game.phase) && allDone(game)) {
     const votes = alive(game).map(p => ({ actorId: p.id, targetId: game.selections[p.id]! }));
-    const result = resolveVote(game.players, votes, game.phase === 'runoff' ? game.runoffIds : undefined);
+    const result = resolveVote(game.players, votes, game.phase === 'runoff' ? game.runoffIds : undefined, game.day === 1);
     game.voteResult = result;
     if (result.runoffIds.length) {
       enter(game, 'runoff', now);
@@ -170,15 +170,17 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
       case 'select': {
         check(['vote', 'runoff', 'night'].includes(game.phase), '対象を選べる段階ではありません');
         check(!game.confirmed.includes(actor.id), '確定済みです');
+        const noExecution = action.targetId === NO_EXECUTION_ID && game.day === 1 && game.phase !== 'night';
         const target = game.players.find(p => p.id === action.targetId && p.alive);
-        check(target && target.id !== actor.id, '対象が不正です');
-        if (game.phase === 'runoff') check(game.runoffIds.includes(target.id), '決選候補ではありません');
+        check(noExecution || (target && target.id !== actor.id), '対象が不正です');
+        if (game.phase === 'runoff') check(game.runoffIds.includes(action.targetId), '決選候補ではありません');
         if (game.phase === 'night') {
+          check(target, '対象が不正です');
           check(hasAbility(actor), '選択する能力がありません');
           if (actor.role === 'wolf') check(target.role !== 'wolf', '人狼は襲撃できません');
         }
         // Define own properties even for special identifiers such as __proto__.
-        Object.defineProperty(game.selections, actor.id, { value: target.id, enumerable: true, writable: true, configurable: true });
+        Object.defineProperty(game.selections, actor.id, { value: action.targetId, enumerable: true, writable: true, configurable: true });
         break;
       }
       case 'confirm': {

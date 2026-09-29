@@ -16,7 +16,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
- for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql','202609280010_points.sql','202609280010_points.sql','202609280011_lovers.sql','202609280011_lovers.sql','202609290013_baker.sql','202609290013_baker.sql']) {
+ for (const name of ['202609250001_lobby.sql','202609270003_game.sql','202609270004_membership.sql','202609270005_night_immediate.sql','202609270006_ending.sql','202609270007_thirteen_players.sql','202609280008_madman.sql','202609280009_result_confirmation.sql','202609280009_result_confirmation.sql','202609280010_points.sql','202609280010_points.sql','202609280011_lovers.sql','202609280011_lovers.sql','202609290013_baker.sql','202609290013_baker.sql','202609290014_first_day_no_execution.sql','202609290014_first_day_no_execution.sql']) {
    if(name==='202609290013_baker.sql')await db.exec("create or replace function app_private.assert_site_access() returns void language plpgsql as $$begin return;end$$");
    await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  }
@@ -381,6 +381,20 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    let morning=await raw('game_command_baker','get',{roomId:f.roomId});assert.equal(morning.game!.public.breadDelivered,true);
    g.players.find(p=>p.role==='baker')!.alive=false;await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);await user(f.users[0]!);
    morning=await raw('game_command_baker','get',{roomId:f.roomId});assert.equal(morning.game!.public.breadDelivered,false);
+  });
+  await t.test('初日の「誰も処刑しない」は保存・集計され、最多なら全員生存する',async()=>{
+   await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/202609290014_first_day_no_execution.sql',import.meta.url),'utf8'));
+   const f=await setup(5);await f.allConfirm();await f.allConfirm();await f.call(f.host,'startVote');
+   let g=await f.state();const living=g.players.filter(p=>p.alive);
+   for(let i=0;i<living.length;i++){
+    const p=living[i]!;await user(f.memberUsers.get(p.id)!);
+    const targetId=i<3?'__no_execution__':living.find(candidate=>candidate.id!==p.id)!.id;
+    await raw('game_command_first_day','select',{roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID(),targetId});
+    g=await f.state();
+    await raw('game_command_first_day','confirm',{roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID()});
+    g=await f.state();
+   }
+   assert.equal(g.phase,'execution',JSON.stringify({voteResult:g.voteResult,selections:g.selections,winner:g.winner,players:g.players}));assert.equal(g.voteResult!.executedId,null);assert.equal(g.voteResult!.counts.__no_execution__,3);assert.ok(g.players.every(p=>p.alive));
   });
  }finally{await db.close();}
 });

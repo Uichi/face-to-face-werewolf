@@ -8,7 +8,7 @@ import { requestId } from './invite.ts';
 import { watchRoom } from './api.ts';
 import { currentTask } from './current-task.ts';
 import GameResult from './GameResult.tsx';
-import { teamOf } from '../domain/rules.ts';
+import { NO_EXECUTION_ID, teamOf } from '../domain/rules.ts';
 import type { Role } from '../domain/rules.ts';
 
 type Pending = { action: string; payload: Record<string, unknown> };
@@ -89,21 +89,23 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const host=pub.hostId===me;
  const phase=pub.phase;
  const alive=pub.players.filter(p=>p.alive);
- const name=(id:string|null|undefined)=>room.members.find(m=>m.id===id)?.nickname ?? '参加者';
+ const name=(id:string|null|undefined)=>id===NO_EXECUTION_ID?'誰も処刑しない':room.members.find(m=>m.id===id)?.nickname ?? '参加者';
  const seconds=pub.deadline===null?null:Math.max(0,Math.ceil((pub.deadline-clock-offset)/1000));
  const role=priv?.role;
  const vote=phase==='vote'||phase==='runoff';
  const night=phase==='night';
  const resultPhase=phase==='execution'||phase==='morning';
+ const noExecutionWon=!!pub.voteResult&&!pub.voteResult.executedId&&pub.voteResult.counts[NO_EXECUTION_ID]===Math.max(...Object.values(pub.voteResult.counts));
  const directlyEliminatedId=phase==='execution'?pub.voteResult?.executedId:phase==='morning'?pub.victimId:null;
  const task=currentTask({resultConfirmation:pub.resultConfirmation===true,phase,alive:self.alive,confirmed:!!priv?.confirmed,selected:!!priv?.selection,roleSeen,busy,retryPending:!!pending,offline});
  const ability=role && ['wolf','seer','knight'].includes(role);
  const candidates=alive.filter(p=>p.id!==me && (phase!=='runoff'||pub.runoffIds.includes(p.id)) && !(night && role==='wolf' && game.wolves?.memberIds.includes(p.id)));
+ const canVoteNoExecution=!!(room.firstDayNoExecution||localDriver)&&vote&&pub.day===1&&(phase==='vote'||pub.runoffIds.includes(NO_EXECUTION_ID));
  const canSelect=self.alive && (vote || (night && ability)) && !priv?.confirmed;
  const openPrivate=()=>{setRevealed(!revealed);setRoleSeen(true);};
- const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=><button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:p.id})}>{name(p.id)}<span>{priv?.selection===p.id?'選択中':'選ぶ'}</span></button>)}</div>;
+ const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=><button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:p.id})}>{name(p.id)}<span>{priv?.selection===p.id?'選択中':'選ぶ'}</span></button>)}{canVoteNoExecution&&<button className={`target-button no-execution ${priv?.selection===NO_EXECUTION_ID?'selected':''}`} aria-pressed={priv?.selection===NO_EXECUTION_ID} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:NO_EXECUTION_ID})}>誰も処刑しない<span>{priv?.selection===NO_EXECUTION_ID?'選択中':'選ぶ'}</span></button>}</div>;
  const confirmButton = <button className="primary" disabled={busy||!!pending||!!priv?.confirmed||((vote||(night&&ability))&&!priv?.selection)||(phase==='roles'&&!roleSeen)} onClick={()=> {
-   if(vote||(night&&ability))setDialog({text:`${name(priv?.selection)}さんで確定しますか？ 確定後は変更できません。`,action:'confirm'});
+   if(vote||(night&&ability))setDialog({text:priv?.selection===NO_EXECUTION_ID?'「誰も処刑しない」への投票を確定しますか？ 確定後は変更できません。':`${name(priv?.selection)}さんで確定しますか？ 確定後は変更できません。`,action:'confirm'});
    else void send('confirm');
  }}>{priv?.confirmed?'確認済み・みんなを待っています':busy?'送信中…':vote?'この人への投票を確定':night&&ability?'この対象で確定':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了'}</button>;
 
@@ -127,9 +129,9 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職を確認してから、確認完了を押してください。</p>{self.alive&&confirmButton}</>}
        {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛はありません。自分の情報を確認したら、夜の確認を完了してください。</p>{self.alive&&confirmButton}</>}
        {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2><p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
-       {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>自分以外の生存者に投票します。確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
+       {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
        {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
-       {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:'同票のため、処刑はありません'}</h2><p>脱落した人の役職は、試合終了まで公開されません。</p></>}
+       {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:noExecutionWon?'投票の結果、誰も処刑されませんでした':'同票のため、処刑はありません'}</h2><p>{pub.voteResult?.executedId?'脱落した人の役職は、試合終了まで公開されません。':'今夜へ進みます。'}</p></>}
        {phase==='morning'&&<><h2>朝になりました</h2>{(pub.composition.baker??0)>0&&<div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status"><span aria-hidden="true">{pub.breadDelivered?'🥖':'…'}</span><div><strong>{pub.breadDelivered?'パン屋から焼きたてのパンが届きました':'今日はパンが届きませんでした'}</strong><p>{pub.breadDelivered?'パン屋はまだ生存しています。誰なのかは公開されません。':'パン屋はすでに脱落しています。'}</p></div></div>}<div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>昨夜の犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div><p>結果を確認したら、次の議論に進みましょう。</p></>}
        {resultPhase&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
        {resultPhase&&pub.resultConfirmation&&<div className="result-confirm"><p>生存者全員の確認で、自動的に次へ進みます。</p>{self.alive&&confirmButton}</div>}

@@ -79,19 +79,22 @@ export type VoteResult = {
   runoffIds: string[];
 };
 
-export function resolveVote(players: readonly Player[], choices: readonly Choice[], runoffIds?: readonly string[]): VoteResult {
+export const NO_EXECUTION_ID = '__no_execution__';
+
+export function resolveVote(players: readonly Player[], choices: readonly Choice[], runoffIds?: readonly string[], allowNoExecution = false): VoteResult {
   const alive = players.filter(p => p.alive);
   requireRule(alive.length >= 2, '投票には2人以上必要です');
-  const candidates = runoffIds ?? alive.map(p => p.id);
+  const candidates = runoffIds ?? [...alive.map(p => p.id), ...(allowNoExecution ? [NO_EXECUTION_ID] : [])];
   requireRule(candidates.length >= 2 && new Set(candidates).size === candidates.length &&
-    candidates.every(id => alive.some(p => p.id === id)), '候補者が不正です');
+    candidates.every(id => id === NO_EXECUTION_ID ? allowNoExecution : alive.some(p => p.id === id)), '候補者が不正です');
   completeChoices(alive, choices);
   requireRule(choices.every(c => c.actorId !== c.targetId && candidates.includes(c.targetId)), '投票先が不正です');
   const counts = Object.fromEntries(candidates.map(id => [id, 0]));
   for (const choice of choices) counts[choice.targetId]!++;
   const maximum = Math.max(...Object.values(counts));
   const leaders = candidates.filter(id => counts[id] === maximum);
-  return { counts, executedId: leaders.length === 1 ? leaders[0]! : null, runoffIds: leaders.length > 1 && !runoffIds ? [...leaders] : [] };
+  const winner = leaders.length === 1 ? leaders[0]! : null;
+  return { counts, executedId: winner === NO_EXECUTION_ID ? null : winner, runoffIds: leaders.length > 1 && !runoffIds ? [...leaders] : [] };
 }
 
 export type NightActions = {

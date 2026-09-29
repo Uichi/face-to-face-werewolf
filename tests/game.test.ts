@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyCommand, createGame, viewFor } from '../src/domain/game.ts';
 import type { Command } from '../src/domain/game.ts';
-import { DEFAULT_COMPOSITIONS } from '../src/domain/rules.ts';
+import { DEFAULT_COMPOSITIONS, NO_EXECUTION_ID } from '../src/domain/rules.ts';
 
 function fixture(count = 5) {
   const ids = count === 5 ? ['v0', 'v1', 'v2', 'w', 's']
@@ -65,6 +65,33 @@ test('議論の時間切れで投票、投票時間切れでは自動投票せ�
   assert.equal(f.game.phase, 'finished');
   assert.equal(f.game.winner, 'village');
   assert.deepEqual(viewFor(f.game, 'v0').public.ending, {playerId:'w',cause:'execution',day:f.game.day});
+});
+
+test('初日は「誰も処刑しない」へ投票でき、最多なら処刑せず夜へ進む', () => {
+  const f = fixture(); f.day(); f.send('v0', { type: 'startVote' });
+  f.vote({ v0: NO_EXECUTION_ID, v1: NO_EXECUTION_ID, v2: NO_EXECUTION_ID, w: 'v0', s: 'w' });
+  assert.equal(f.game.phase, 'execution');
+  assert.equal(f.game.voteResult!.executedId, null);
+  assert.equal(f.game.voteResult!.counts[NO_EXECUTION_ID], 3);
+  assert.equal(f.game.players.every(player => player.alive), true);
+  f.confirmAll();
+  assert.equal(f.game.phase, 'night');
+});
+
+test('「誰も処刑しない」は初日だけ選べ、同票なら決選候補に残る', () => {
+  const f = fixture(); f.day(); f.send('v0', { type: 'startVote' });
+  f.vote({ v0: NO_EXECUTION_ID, v1: NO_EXECUTION_ID, v2: 'w', w: 'v2', s: 'v2' });
+  assert.equal(f.game.phase, 'runoff');
+  assert.deepEqual(f.game.runoffIds.sort(), [NO_EXECUTION_ID, 'v2'].sort());
+  f.vote({ v0: NO_EXECUTION_ID, v1: NO_EXECUTION_ID, v2: NO_EXECUTION_ID, w: 'v2', s: 'v2' });
+  f.confirmAll();
+  for (const player of f.game.players.filter(player => player.alive)) {
+    if (['wolf', 'seer', 'knight'].includes(player.role)) f.send(player.id, { type: 'select', targetId: player.role === 'wolf' ? 'v0' : 'w' });
+    f.send(player.id, { type: 'confirm' });
+  }
+  f.confirmAll();
+  f.send('v0', { type: 'startVote' });
+  assert.throws(() => f.send('v0', { type: 'select', targetId: NO_EXECUTION_ID }));
 });
 
 test('選択は変更可、確定後は変更不可。主催者権限と未選択の確定を検証', () => {
