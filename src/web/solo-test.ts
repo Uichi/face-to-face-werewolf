@@ -65,8 +65,7 @@ function targetFor(game: Game, actorId: string, preferredTargetId?: string): str
     && (game.phase === 'vote' || game.runoffIds.includes(NO_EXECUTION_ID))) return NO_EXECUTION_ID;
   if (!candidates.length) throw new Error('選べる対象がいません。');
   if (preferredTargetId && candidates.some(player => player.id === preferredTargetId)) return preferredTargetId;
-  if (['vote', 'runoff'].includes(game.phase)) return candidates.find(player => player.role === 'wolf')?.id ?? candidates[0]!.id;
-  return candidates[0]!.id;
+  return candidates[Math.floor(Math.random() * candidates.length)]!.id;
 }
 
 export function completeSoloPhase(session: SoloSession, includeViewer: boolean, preferredTargetId?: string): SoloSession {
