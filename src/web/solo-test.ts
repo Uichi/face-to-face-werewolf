@@ -7,26 +7,29 @@ import type { GameResponse } from './game-api.ts';
 import type { Room } from './types.ts';
 
 export const SOLO_VIEWER = 'solo-0';
-const IDS = Array.from({ length: 5 }, (_, index) => `solo-${index}`);
-const NAMES = ['あなた', 'テスト1', 'テスト2', 'テスト3', 'テスト4'];
 export type SoloSession = { game: Game; room: Room; now: number; sequence: number };
 
-function compositionFor(role: Role): Composition {
-  if (['villager', 'wolf', 'seer'].includes(role)) return { ...DEFAULT_COMPOSITIONS[5]! };
-  if (role === 'lover') return { villager: 1, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 2, baker: 0 };
-  return { villager: 2, wolf: 1, seer: 1, medium: role === 'medium' ? 1 : 0, knight: role === 'knight' ? 1 : 0, madman: role === 'madman' ? 1 : 0, lover: 0, baker: role === 'baker' ? 1 : 0 };
+function compositionFor(role: Role, count: number): Composition {
+  const composition = { ...DEFAULT_COMPOSITIONS[count]! };
+  if (role === 'lover' && composition.lover === 0) {
+    composition.villager -= 2; composition.lover = 2;
+  } else if (composition[role] === 0) {
+    composition.villager -= 1; composition[role] = 1;
+  }
+  return composition;
 }
 
-export function createSoloSession(role: Role = 'villager'): SoloSession {
-  const composition = compositionFor(role);
-  const game = createGame({ id: `solo-game-${Date.now()}`, hostId: SOLO_VIEWER, playerIds: IDS, composition, discussionMinutes: 1 }, Date.now(), () => 0);
+export function createSoloSession(role: Role = 'villager', count = 5): SoloSession {
+  const composition = compositionFor(role, count);
+  const ids = Array.from({ length: count }, (_, index) => `solo-${index}`);
+  const game = createGame({ id: `solo-game-${Date.now()}`, hostId: SOLO_VIEWER, playerIds: ids, composition, discussionMinutes: 1 }, Date.now(), () => 0);
   const chosen = game.players.find(player => player.role === role)!;
   const mine = game.players.find(player => player.id === SOLO_VIEWER)!;
   [chosen.role, mine.role] = [mine.role, chosen.role];
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
     loverRole: true, bakerRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
-    customComposition: true, members: IDS.map((id, index) => ({ id, nickname: NAMES[index]!, connected: true, points: 0 })),
+    customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
 }
@@ -45,7 +48,7 @@ function run(session: SoloSession, actorId: string | null, action: Command['acti
 
 export function applySoloAction(session: SoloSession, action: string, payload: Record<string, unknown> = {}, actorId = SOLO_VIEWER): SoloSession {
   if (action === 'get') return session;
-  if (action === 'rematch') return createSoloSession(session.game.players.find(player => player.id === SOLO_VIEWER)?.role ?? 'villager');
+  if (action === 'rematch') return createSoloSession(session.game.players.find(player => player.id === SOLO_VIEWER)?.role ?? 'villager', session.game.players.length);
   if (action === 'select') return run(session, actorId, { type: 'select', targetId: String(payload.targetId) });
   if (action === 'remove') return run(session, actorId, { type: 'remove', targetId: String(payload.targetId) });
   if (['confirm', 'startVote', 'extend', 'next'].includes(action)) return run(session, actorId, { type: action } as Command['action']);

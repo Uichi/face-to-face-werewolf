@@ -5,11 +5,24 @@ import { completeSoloPhase, createCheckScenario, createEndingScenario, createSol
 
 test('ひとり試遊では選んだ役職が本人に割り当てられる', () => {
   const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker'];
-  for (const role of roles) {
-    const session = createSoloSession(role);
-    assert.equal(session.game.players.find(player => player.id === SOLO_VIEWER)?.role, role);
-    assert.equal(session.game.players.length, 5);
+  for (const count of [5, 10, 13]) {
+    for (const role of roles) {
+      const session = createSoloSession(role, count);
+      assert.equal(session.game.players.find(player => player.id === SOLO_VIEWER)?.role, role);
+      assert.equal(session.game.players.length, count);
+      assert.equal(session.room.members.length, count);
+    }
   }
+});
+
+test('10人試遊を自動操作で役職確認から議論まで進められる', () => {
+  let session = createSoloSession('villager', 10);
+  session = completeSoloPhase(session, true);
+  assert.equal(session.game.phase, 'firstNight');
+  session = completeSoloPhase(session, true);
+  assert.equal(session.game.phase, 'discussion');
+  assert.equal(session.game.players.filter(player => player.role === 'wolf').length, 2);
+  assert.equal(session.game.players.filter(player => player.role === 'madman').length, 1);
 });
 
 test('全員の自動操作で役職確認から議論まで進む', () => {
