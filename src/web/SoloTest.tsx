@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { Role } from '../domain/rules.ts';
 import GameScreen from './GameScreen.tsx';
 import { roleNames } from './types.ts';
-import { applySoloAction, completeSoloPhase, createEndingScenario, createSoloSession, soloResponse } from './solo-test.ts';
+import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
 const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover'];
@@ -11,6 +11,7 @@ const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '�
 export default function SoloTest({ onExit }: { onExit: () => void }) {
   const [role, setRole] = useState<Role>('villager');
   const [session, setSession] = useState<SoloSession | null>(null);
+  const [autoTarget, setAutoTarget] = useState('');
   const sessionRef = useRef<SoloSession | null>(null);
   const update = (next: SoloSession | null) => { sessionRef.current = next; setSession(next); };
   const response = useMemo(() => session ? soloResponse(session) : null, [session]);
@@ -23,9 +24,13 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
     <p className="muted">あなた以外の4人を自動操作して、5人ゲームの画面と進行を確認できます。部屋やポイントは保存されません。</p>
     <label>確認したい自分の役職<select value={role} onChange={event => setRole(event.target.value as Role)}>{roles.map(value => <option value={value} key={value}>{roleNames[value]}</option>)}</select></label>
     <button className="primary" onClick={() => update(createSoloSession(role))}>最初から試遊を始める</button>
-    <div className="solo-scenarios"><h2>終了画面だけ確認</h2><p>投票結果から勝敗までをすぐ表示します。</p>
+    <div className="solo-scenarios"><h2>確認したい場面から始める</h2><p>通常と同じ判定処理を通して、選んだ場面をすぐ表示します。</p>
       <button className="secondary-button" onClick={() => update(createEndingScenario('village'))}>人狼を処刑 → 村側勝利</button>
       <button className="secondary-button" onClick={() => update(createEndingScenario('wolves'))}>村人を処刑 → 人狼側勝利</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('lover-execution'))}>恋人を処刑 → 相方が後追い</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('lover-attack'))}>恋人を襲撃 → 相方が後追い</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('guard-success'))}>騎士の護衛成功 → 犠牲者なし</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('runoff'))}>同票 → 決選投票</button>
     </div>
   </section>;
 
@@ -33,7 +38,9 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
   const incompleteBots = game.players.filter(player => player.alive && player.id !== response.room.viewerId && !game.confirmed.includes(player.id)).length;
   return <><aside className="solo-toolbar" aria-label="ひとり試遊の操作">
     <div><strong>ひとり試遊中</strong><span>{game.day}日目・{phaseNames[game.phase]}</span></div>
-    {game.phase !== 'finished' && <div className="solo-toolbar-actions"><button className="secondary-button" disabled={incompleteBots === 0 || game.phase === 'discussion'} onClick={() => update(completeSoloPhase(sessionRef.current!, false))}>テスト4人を完了</button><button className="secondary-button" onClick={() => update(completeSoloPhase(sessionRef.current!, true))}>この段階を全員自動で進める</button></div>}
+    {game.phase !== 'finished' && <div className="solo-toolbar-actions">
+      {['vote','runoff'].includes(game.phase) && <label className="solo-target">自動投票先<select value={autoTarget} onChange={event => setAutoTarget(event.target.value)}><option value="">人狼を優先</option>{game.players.filter(player => player.alive).map(player => <option key={player.id} value={player.id}>{response.room.members.find(member => member.id === player.id)?.nickname}</option>)}</select></label>}
+      <button className="secondary-button" disabled={incompleteBots === 0 || game.phase === 'discussion'} onClick={() => update(completeSoloPhase(sessionRef.current!, false, autoTarget || undefined))}>テスト4人を完了</button><button className="secondary-button" onClick={() => update(completeSoloPhase(sessionRef.current!, true, autoTarget || undefined))}>この段階を全員自動で進める</button></div>}
     <button className="text-button" onClick={() => update(null)}>役職を選び直す</button><button className="text-button" onClick={onExit}>試遊を終了</button>
   </aside><GameScreen key={game.id} room={response.room} onRoom={() => {}} onHome={() => update(null)} localDriver={driver}/></>;
 }

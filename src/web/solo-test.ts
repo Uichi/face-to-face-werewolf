@@ -53,17 +53,18 @@ export function applySoloAction(session: SoloSession, action: string, payload: R
 }
 
 const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
-function targetFor(game: Game, actorId: string): string {
+function targetFor(game: Game, actorId: string, preferredTargetId?: string): string {
   const actor = game.players.find(player => player.id === actorId)!;
   const candidates = game.players.filter(player => player.alive && player.id !== actorId
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))
     && !(game.phase === 'night' && actor.role === 'wolf' && player.role === 'wolf'));
   if (!candidates.length) throw new Error('選べる対象がいません。');
+  if (preferredTargetId && candidates.some(player => player.id === preferredTargetId)) return preferredTargetId;
   if (['vote', 'runoff'].includes(game.phase)) return candidates.find(player => player.role === 'wolf')?.id ?? candidates[0]!.id;
   return candidates[0]!.id;
 }
 
-export function completeSoloPhase(session: SoloSession, includeViewer: boolean): SoloSession {
+export function completeSoloPhase(session: SoloSession, includeViewer: boolean, preferredTargetId?: string): SoloSession {
   const startingPhase = session.game.phaseId;
   let next = session;
   if (next.game.phase === 'discussion') return includeViewer ? applySoloAction(next, 'startVote') : next;
@@ -72,7 +73,7 @@ export function completeSoloPhase(session: SoloSession, includeViewer: boolean):
     if (next.game.phaseId !== startingPhase || next.game.phase === 'finished') break;
     const actor = next.game.players.find(player => player.id === actorId)!;
     if (next.game.confirmed.includes(actorId)) continue;
-    if (needsSelection(actor.role, next.game.phase) && !Object.hasOwn(next.game.selections, actorId)) next = applySoloAction(next, 'select', { targetId: targetFor(next.game, actorId) }, actorId);
+    if (needsSelection(actor.role, next.game.phase) && !Object.hasOwn(next.game.selections, actorId)) next = applySoloAction(next, 'select', { targetId: targetFor(next.game, actorId, preferredTargetId) }, actorId);
     next = applySoloAction(next, 'confirm', {}, actorId);
   }
   return next;
@@ -82,6 +83,13 @@ function prepareVote(session: SoloSession): SoloSession {
   const game = structuredClone(session.game);
   game.phase = 'vote'; game.phaseId += 1; game.day = 1; game.deadline = session.now + 60_000;
   game.selections = {}; game.confirmed = []; game.runoffIds = []; game.voteResult = null;
+  return { ...session, game };
+}
+
+function prepareNight(session: SoloSession): SoloSession {
+  const game = structuredClone(session.game);
+  game.phase = 'night'; game.phaseId += 1; game.day = 1; game.deadline = session.now + 60_000;
+  game.selections = {}; game.confirmed = []; game.runoffIds = []; game.voteResult = null; game.victimId = null;
   return { ...session, game };
 }
 
@@ -101,6 +109,54 @@ export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession 
       session = applySoloAction(session, 'select', { targetId: actor.id === wolf.id ? SOLO_VIEWER : wolf.id }, actor.id);
       session = applySoloAction(session, 'confirm', {}, actor.id);
     }
+  }
+  return session;
+}
+
+export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'runoff';
+export function createCheckScenario(kind: CheckScenario): SoloSession {
+  if (kind === 'lover-execution') {
+    let session = prepareVote(createSoloSession('lover'));
+    const target = session.game.players.find(player => player.role === 'lover' && player.id !== SOLO_VIEWER)!;
+    const wolf = session.game.players.find(player => player.role === 'wolf')!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      const fallback = actor.id === target.id ? wolf.id : target.id;
+      session = applySoloAction(session, 'select', { targetId: fallback }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'lover-attack') {
+    let session = prepareNight(createSoloSession('lover'));
+    const target = session.game.players.find(player => player.role === 'lover' && player.id !== SOLO_VIEWER)!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      if (actor.role === 'wolf') session = applySoloAction(session, 'select', { targetId: target.id }, actor.id);
+      else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: targetFor(session.game, actor.id) }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'guard-success') {
+    let session = prepareNight(createSoloSession('knight'));
+    const knight = session.game.players.find(player => player.role === 'knight')!;
+    const target = session.game.players.find(player => player.alive && player.role !== 'wolf' && player.id !== knight.id)!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      if (actor.role === 'wolf' || actor.role === 'knight') session = applySoloAction(session, 'select', { targetId: target.id }, actor.id);
+      else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: targetFor(session.game, actor.id) }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  let session = prepareVote(createSoloSession('villager'));
+  const wolf = session.game.players.find(player => player.role === 'wolf')!;
+  const villager = session.game.players.find(player => player.role === 'villager' && player.id !== SOLO_VIEWER)!;
+  const others = session.game.players.filter(player => player.id !== wolf.id && player.id !== villager.id);
+  const choices = new Map<string, string>([
+    [wolf.id, villager.id], [villager.id, wolf.id], [others[0]!.id, wolf.id], [others[1]!.id, villager.id], [others[2]!.id, others[0]!.id],
+  ]);
+  for (const actor of session.game.players) {
+    session = applySoloAction(session, 'select', { targetId: choices.get(actor.id)! }, actor.id);
+    session = applySoloAction(session, 'confirm', {}, actor.id);
   }
   return session;
 }
