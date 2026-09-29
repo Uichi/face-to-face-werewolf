@@ -94,6 +94,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const vote=phase==='vote'||phase==='runoff';
  const night=phase==='night';
  const resultPhase=phase==='execution'||phase==='morning';
+ const directlyEliminatedId=phase==='execution'?pub.voteResult?.executedId:phase==='morning'?pub.victimId:null;
  const task=currentTask({resultConfirmation:pub.resultConfirmation===true,phase,alive:self.alive,confirmed:!!priv?.confirmed,selected:!!priv?.selection,roleSeen,busy,retryPending:!!pending,offline});
  const ability=role && ['wolf','seer','knight'].includes(role);
  const candidates=alive.filter(p=>p.id!==me && (phase!=='runoff'||pub.runoffIds.includes(p.id)) && !(night && role==='wolf' && game.wolves?.memberIds.includes(p.id)));
@@ -129,7 +130,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
        {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:'同票のため、処刑はありません'}</h2><p>脱落した人の役職は、試合終了まで公開されません。</p></>}
        {phase==='morning'&&<><h2>{pub.victimId?`${name(pub.victimId)}さんが犠牲になりました`:'今朝の犠牲者はいません'}</h2><p>結果を確認したら、次の議論に進みましょう。</p></>}
-       {resultPhase&&pub.followedIds?.length>0&&<p className="inline-note">{pub.followedIds.map(id=>`${name(id)}さん`).join("、")}も脱落しました。</p>}
+       {resultPhase&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
        {resultPhase&&pub.resultConfirmation&&<div className="result-confirm"><p>生存者全員の確認で、自動的に次へ進みます。</p>{self.alive&&confirmButton}</div>}
        {(['roles','firstNight','vote','runoff','night'].includes(phase)||(resultPhase&&pub.resultConfirmation))&&<div className="completion"><span>操作完了</span><strong>{pub.completedCount} / {pub.requiredCount}人</strong><progress value={pub.completedCount} max={pub.requiredCount}/></div>}
        {seconds===0&&['vote','runoff','night'].includes(phase)&&<p className="inline-note">時間は終了しましたが、操作は引き続き受け付けています。自動で投票や能力使用はしません。</p>}
