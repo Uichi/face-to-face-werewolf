@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { Role } from '../domain/rules.ts';
 import GameScreen from './GameScreen.tsx';
 import { roleNames } from './types.ts';
-import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createSoloSession, soloResponse } from './solo-test.ts';
+import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
 const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief'];
@@ -27,6 +27,7 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
     <label>確認したい自分の役職<select value={role} onChange={event => setRole(event.target.value as Role)}>{roles.map(value => <option value={value} key={value}>{roleNames[value]}</option>)}</select></label>
     <button className="primary" onClick={() => update(createSoloSession(role, playerCount))}>{playerCount}人で最初から試遊を始める</button>
     <div className="solo-scenarios"><h2>確認したい場面から始める</h2><p>通常と同じ判定処理を通して、選んだ場面をすぐ表示します。</p>
+      {role !== 'thief' && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}
       <button className="secondary-button" onClick={() => update(createEndingScenario('village'))}>人狼を処刑 → 村側勝利</button>
       <button className="secondary-button" onClick={() => update(createEndingScenario('wolves'))}>村人を処刑 → 人狼側勝利</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('lover-execution'))}>恋人を処刑 → 相方が後追い</button>

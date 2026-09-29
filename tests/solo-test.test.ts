@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Role } from '../src/domain/rules.ts';
-import { completeSoloPhase, createCheckScenario, createEndingScenario, createSoloSession, SOLO_VIEWER, soloResponse } from '../src/web/solo-test.ts';
+import { completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, SOLO_VIEWER, soloResponse } from '../src/web/solo-test.ts';
 
 test('ひとり試遊では選んだ役職が本人に割り当てられる', () => {
   const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker'];
@@ -32,6 +32,19 @@ test('全員の自動操作で役職確認から議論まで進む', () => {
   session = completeSoloPhase(session, true);
   assert.equal(session.game.phase, 'discussion');
   assert.equal(soloResponse(session).game?.private?.role, 'seer');
+});
+
+test('怪盗に選んだ役職を奪われた初夜を一人で確認できる', () => {
+  for (const role of ['seer', 'wolf', 'knight', 'lover'] as const) {
+    const session = createRobbedScenario(role, 10);
+    const response = soloResponse(session);
+    const mine = session.game.players.find(player => player.id === SOLO_VIEWER)!;
+    assert.equal(session.game.phase, 'firstNight');
+    assert.equal(mine.role, 'villager');
+    assert.equal(response.game!.private!.role, role);
+    assert.equal(response.game!.private!.thiefExchange, null);
+    assert.equal(session.game.players.filter(player => player.initialRole === 'thief').length, 1);
+  }
 });
 
 test('村側勝利シナリオは投票と最後の脱落者を残す', () => {

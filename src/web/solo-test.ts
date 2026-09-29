@@ -36,6 +36,23 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   return { game, room, now: game.lastTime, sequence: 0 };
 }
 
+export function createRobbedScenario(role: Exclude<Role, 'thief'>, count = 10): SoloSession {
+  let session = createSoloSession(role, count);
+  const mine = session.game.players.find(player => player.id === SOLO_VIEWER)!;
+  const thief = session.game.players.find(player => player.id !== SOLO_VIEWER && player.role === 'villager')
+    ?? session.game.players.find(player => player.id !== SOLO_VIEWER && player.role !== 'wolf' && player.role !== 'lover')!;
+  const previousRole = thief.role;
+  thief.role = thief.initialRole = thief.apparentRole = 'thief';
+  session.room.composition = {
+    ...session.room.composition!,
+    [previousRole]: (session.room.composition![previousRole] ?? 0) - 1,
+    thief: 1,
+  };
+  session = applySoloAction(session, 'select', { targetId: mine.id }, thief.id);
+  for (const player of session.game.players) session = applySoloAction(session, 'confirm', {}, player.id);
+  return session;
+}
+
 export function soloResponse(session: SoloSession): GameResponse {
   const room = { ...session.room, status: session.game.phase === 'finished' ? 'finished' as const : 'playing' as const };
   return { ok: true, room, game: viewFor(session.game, SOLO_VIEWER), serverNow: session.now };
