@@ -23,8 +23,10 @@ const roleDetails: Record<Role, string> = {
  knight: 'あなたは村側です。夜に自分以外の1人を護衛します。同じ人を続けて護衛できます。',
 };
 
-export default function GameScreen({ room, onRoom, onHome, helpOpen = false }: { helpOpen?: boolean; room: Room; onRoom: (room: Room) => void; onHome: () => void }) {
- const [game, setGame] = useState<GameView | null>(null);
+export type LocalGameDriver = { response: GameResponse; command: (action: string, payload: Record<string, unknown>) => Promise<GameResponse> };
+
+export default function GameScreen({ room, onRoom, onHome, helpOpen = false, localDriver }: { helpOpen?: boolean; room: Room; onRoom: (room: Room) => void; onHome: () => void; localDriver?: LocalGameDriver }) {
+ const [game, setGame] = useState<GameView | null>(localDriver?.response.game ?? null);
  const [error, setError] = useState('');
  const [offline, setOffline] = useState(false);
  const [busy, setBusy] = useState(false);
@@ -50,20 +52,21 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false }: {
  const refresh = useCallback(async () => {
    if (polling.current || sending.current || document.visibilityState === 'hidden') return;
    polling.current = true;
-   try { apply(await gameCommand('get', { roomId: room.id })); }
+   try { apply(localDriver ? localDriver.response : await gameCommand('get', { roomId: room.id })); }
    catch (e) { if (active.current) { setOffline(true); if (!gameRef.current) setError((e as Error).message); } }
    finally { polling.current = false; }
- }, [room.id, apply]);
+ }, [room.id, apply, localDriver]);
  useEffect(() => {
    active.current = true; void refresh();
    const tick = setInterval(() => { setClock(Date.now()); }, 500);
-   const poll = setInterval(() => { void refresh(); }, 2000);
-   const stop = watchRoom(room.id, () => { void refresh(); });
+   const poll = localDriver ? 0 : window.setInterval(() => { void refresh(); }, 2000);
+   const stop = localDriver ? () => {} : watchRoom(room.id, () => { void refresh(); });
    const visible = () => { if (document.visibilityState !== 'visible') setRevealed(false); else void refresh(); };
    const blur = () => setRevealed(false);
    document.addEventListener('visibilitychange', visible); window.addEventListener('blur', blur); window.addEventListener('online', visible);
-   return () => { active.current = false; clearInterval(tick); clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
- }, [refresh, room.id]);
+   return () => { active.current = false; clearInterval(tick); if (poll) clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
+ }, [refresh, room.id, localDriver]);
+ useEffect(() => { if (localDriver) apply(localDriver.response); }, [localDriver?.response, apply, localDriver]);
  useEffect(() => { setRevealed(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
  useEffect(() => { if (helpOpen) setRevealed(false); }, [helpOpen]);
  useEffect(() => { if (!revealed) return; const timer=setTimeout(() => setRevealed(false), 20_000); return () => clearTimeout(timer); }, [revealed]);
@@ -74,10 +77,10 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false }: {
    const command = retry ?? { action, payload: { roomId: room.id, gameId: current.public.id, phaseId: current.public.phaseId, requestId: requestId(), ...extra } };
    sending.current = true; setBusy(true); setError(''); setDialog(null);
    if (action !== 'select') setRevealed(false);
-   try { apply(await gameCommand(command.action, command.payload)); setPending(null); }
+   try { apply(await (localDriver ? localDriver.command(command.action, command.payload) : gameCommand(command.action, command.payload))); setPending(null); }
    catch (e) {
      if (active.current) { setError((e as Error).message); setPending(e instanceof GameError && e.retryable ? command : null); }
-   } finally { sending.current = false; if (active.current) setBusy(false); void refresh(); }
+   } finally { sending.current = false; if (active.current) setBusy(false); if (!localDriver) void refresh(); }
  }
  if (!game) return <section className="panel game-loading"><h1>試合に接続しています</h1><p role="status">{error || '少しお待ちください。'}</p><button className="primary" onClick={() => void refresh()}>再接続</button></section>;
  const pub=game.public, priv=game.private;

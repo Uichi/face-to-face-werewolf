@@ -15,6 +15,7 @@ import { Scoreboard, ScoringRules } from './Points.tsx';
 import Turnstile from './Turnstile.tsx';
 import { invitationUrl, requestId as newRequestId } from './invite.ts';
 import AccessGate from './AccessGate.tsx';
+import SoloTest from './SoloTest.tsx';
 
 const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
@@ -45,6 +46,7 @@ export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [preview, setPreview] = useState(false);
+  const [soloTest, setSoloTest] = useState(false);
   const [nickname, setNickname] = useState('');
   const [code, setCode] = useState(inviteCode());
   const [error, setError] = useState('');
@@ -145,7 +147,7 @@ export default function App() {
     } catch (e) { if (screen === 'create' && e instanceof RoomAccessLostError) save(REQUEST, null); setError((e as Error).message); setToken(''); setCaptchaVersion(v => v + 1); }
     finally { setBusy(false); operation.current = false; }
   }
-  function home() { setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); history.replaceState(null, '', location.pathname); }
+  function home() { setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); setSoloTest(false); history.replaceState(null, '', location.pathname); }
   async function updateSettings(composition: Composition | null, discussionMinutes: number, victoryPoints?: VictoryPoints) {
     if (!room || operation.current) return;
     operation.current = true; setBusy(true); setError(''); setNotice('');
@@ -225,12 +227,13 @@ export default function App() {
       {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
-      {room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onResetPoints={clearPoints} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} helpOpen={rulesOpen} room={room} onRoom={receiveRoom} onHome={home}/> : <>
+      {soloTest ? <SoloTest onExit={home}/> : room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onResetPoints={clearPoints} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} helpOpen={rulesOpen} room={room} onRoom={receiveRoom} onHome={home}/> : <>
         {screen === 'home' ? <div className="home-grid">
           <section className="hero"><div className="eyebrow">A LITTLE MYSTERY, TOGETHER.</div><h1>いつもの顔に、<br/>ひとつの秘密。</h1><p>この中に、人狼がいる。<br/>同じ場所に集まった仲間と、<br/>スマホひとつで始まる推理の夜。</p><div className="hero-tags"><span>5〜13人</span><span>司会者いらず</span><span>登録不要</span></div><Forest/></section>
           <section className="home-actions"><div className="section-number">01 — 集まる</div><h2>さあ、席につこう。</h2><p className="muted">会話は目の前で。進行はおまかせ。</p>
             <button className="action-card" disabled={busy} onClick={() => { setScreen('create'); setError(''); }}><span className="action-icon">＋</span><span><strong>部屋をつくる</strong><small>主催者になって、みんなを招待</small></span><span className="arrow">↗</span></button>
             <button className="action-card secondary-card" disabled={busy} onClick={() => { setScreen('join'); setError(''); }}><span className="action-icon">⌗</span><span><strong>部屋に参加する</strong><small>招待された部屋のコードを入力</small></span><span className="arrow">→</span></button>
+            <button className="action-card solo-card" disabled={busy} onClick={() => { setSoloTest(true); setError(''); setNotice(''); }}><span className="action-icon">◎</span><span><strong>ひとりで試遊する</strong><small>テスト4人と、画面・進行・勝敗を確認</small></span><span className="arrow">→</span></button>
             {savedRoom && <div className="saved-room-actions">{configured && <button className="resume" disabled={busy} onClick={() => void resume(savedRoom)}>前の部屋に戻る →</button>}<button className="text-button" disabled={busy} onClick={forgetHistory}>部屋の履歴を消す</button></div>}
             {!configured && <div className="preview-note"><span className="dot"/>現在は画面確認版です。<button className="text-button" onClick={() => { setPreview(true); setRoom(demoRoom()); setError(''); }}>待機室をプレビュー →</button></div>}
             <div className="how"><div><b>1</b><span>仲間を招待</span></div><i/><div><b>2</b><span>役職を確認</span></div><i/><div><b>3</b><span>会話で推理</span></div></div>
