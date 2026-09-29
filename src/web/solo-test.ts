@@ -1,6 +1,6 @@
 import { applyCommand, createGame, viewFor } from '../domain/game.ts';
 import type { Command, Game, Phase } from '../domain/game.ts';
-import { DEFAULT_COMPOSITIONS } from '../domain/rules.ts';
+import { DEFAULT_COMPOSITIONS, NO_EXECUTION_ID } from '../domain/rules.ts';
 import type { Composition, Role } from '../domain/rules.ts';
 import { DEFAULT_VICTORY_POINTS } from '../domain/scoring.ts';
 import type { GameResponse } from './game-api.ts';
@@ -25,7 +25,7 @@ export function createSoloSession(role: Role = 'villager'): SoloSession {
   [chosen.role, mine.role] = [mine.role, chosen.role];
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: IDS.map((id, index) => ({ id, nickname: NAMES[index]!, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -58,6 +58,8 @@ function targetFor(game: Game, actorId: string, preferredTargetId?: string): str
   const candidates = game.players.filter(player => player.alive && player.id !== actorId
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))
     && !(game.phase === 'night' && actor.role === 'wolf' && player.role === 'wolf'));
+  if (preferredTargetId === NO_EXECUTION_ID && game.day === 1 && ['vote','runoff'].includes(game.phase)
+    && (game.phase === 'vote' || game.runoffIds.includes(NO_EXECUTION_ID))) return NO_EXECUTION_ID;
   if (!candidates.length) throw new Error('選べる対象がいません。');
   if (preferredTargetId && candidates.some(player => player.id === preferredTargetId)) return preferredTargetId;
   if (['vote', 'runoff'].includes(game.phase)) return candidates.find(player => player.role === 'wolf')?.id ?? candidates[0]!.id;
@@ -113,7 +115,7 @@ export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession 
   return session;
 }
 
-export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'runoff';
+export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf';
 export function createCheckScenario(kind: CheckScenario): SoloSession {
   if (kind === 'lover-execution') {
     let session = prepareVote(createSoloSession('lover'));
@@ -143,6 +145,53 @@ export function createCheckScenario(kind: CheckScenario): SoloSession {
     for (const actor of session.game.players.filter(player => player.alive)) {
       if (actor.role === 'wolf' || actor.role === 'knight') session = applySoloAction(session, 'select', { targetId: target.id }, actor.id);
       else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: targetFor(session.game, actor.id) }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'guard-failure') {
+    let session = prepareNight(createSoloSession('knight'));
+    const knight = session.game.players.find(player => player.role === 'knight')!;
+    const targets = session.game.players.filter(player => player.alive && player.role !== 'wolf' && player.id !== knight.id);
+    const attacked = targets[0]!, guarded = targets[1]!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      if (actor.role === 'wolf') session = applySoloAction(session, 'select', { targetId: attacked.id }, actor.id);
+      else if (actor.role === 'knight') session = applySoloAction(session, 'select', { targetId: guarded.id }, actor.id);
+      else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: targetFor(session.game, actor.id) }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'no-execution') {
+    let session = prepareVote(createSoloSession('villager'));
+    for (const actor of session.game.players) {
+      session = applySoloAction(session, 'select', { targetId: NO_EXECUTION_ID }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'no-execution-runoff') {
+    let session = prepareVote(createSoloSession('villager'));
+    const wolf = session.game.players.find(player => player.role === 'wolf')!;
+    const others = session.game.players.filter(player => player.id !== wolf.id);
+    const choices = new Map<string,string>([
+      [wolf.id, NO_EXECUTION_ID], [others[0]!.id, NO_EXECUTION_ID],
+      [others[1]!.id, wolf.id], [others[2]!.id, wolf.id], [others[3]!.id, others[0]!.id],
+    ]);
+    for (const actor of session.game.players) {
+      session = applySoloAction(session, 'select', { targetId: choices.get(actor.id)! }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'baker-alive' || kind === 'baker-dead' || kind === 'seer-wolf') {
+    let session = prepareNight(createSoloSession(kind === 'seer-wolf' ? 'seer' : 'baker'));
+    const baker = session.game.players.find(player => player.role === 'baker');
+    const wolf = session.game.players.find(player => player.role === 'wolf')!;
+    const attacked = kind === 'baker-dead' ? baker! : session.game.players.find(player => player.alive && player.role === 'villager')!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      if (actor.role === 'wolf') session = applySoloAction(session, 'select', { targetId: attacked.id }, actor.id);
+      else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: kind === 'seer-wolf' ? wolf.id : targetFor(session.game, actor.id) }, actor.id);
       session = applySoloAction(session, 'confirm', {}, actor.id);
     }
     return session;

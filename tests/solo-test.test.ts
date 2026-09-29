@@ -59,3 +59,27 @@ test('護衛成功と決選投票の確認場面を作れる', () => {
   assert.equal(runoff.public.runoffIds.length, 2);
   assert.deepEqual([...Object.values(runoff.public.voteResult?.counts ?? {})].filter(count => count > 0).sort(), [1, 2, 2]);
 });
+
+test('処刑なし・護衛失敗・占い発見・パン屋の各場面を作れる', () => {
+  const noExecution = soloResponse(createCheckScenario('no-execution')).game!;
+  assert.equal(noExecution.public.phase, 'execution');
+  assert.equal(noExecution.public.voteResult?.executedId, null);
+  assert.equal(noExecution.public.voteResult?.counts.__no_execution__, 5);
+
+  const noExecutionRunoff = soloResponse(createCheckScenario('no-execution-runoff')).game!;
+  assert.equal(noExecutionRunoff.public.phase, 'runoff');
+  assert.ok(noExecutionRunoff.public.runoffIds.includes('__no_execution__'));
+
+  const failedGuard = soloResponse(createCheckScenario('guard-failure')).game!;
+  assert.equal(failedGuard.public.phase, 'morning');
+  assert.ok(failedGuard.public.victimId);
+
+  const seer = soloResponse(createCheckScenario('seer-wolf')).game!;
+  assert.ok(seer.private?.results.some(result => result.kind === 'seer' && result.isWolf));
+
+  const bread = soloResponse(createCheckScenario('baker-alive')).game!;
+  assert.equal(bread.public.breadDelivered, true);
+  const noBread = soloResponse(createCheckScenario('baker-dead')).game!;
+  assert.equal(noBread.public.breadDelivered, false);
+  assert.ok(noBread.public.victimId);
+});

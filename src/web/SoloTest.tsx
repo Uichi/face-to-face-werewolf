@@ -30,7 +30,13 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
       <button className="secondary-button" onClick={() => update(createCheckScenario('lover-execution'))}>恋人を処刑 → 相方が後追い</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('lover-attack'))}>恋人を襲撃 → 相方が後追い</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('guard-success'))}>騎士の護衛成功 → 犠牲者なし</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('guard-failure'))}>騎士の護衛失敗 → 襲撃の犠牲者</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('runoff'))}>同票 → 決選投票</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('no-execution'))}>初日「誰も処刑しない」→ 処刑なし</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('no-execution-runoff'))}>処刑なしと同票 → 決選投票</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('seer-wolf'))}>占い師が人狼を発見</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('baker-alive'))}>パン屋が生存 → パンが届く朝</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('baker-dead'))}>パン屋が襲撃 → パンが届かない朝</button>
     </div>
   </section>;
 
@@ -39,7 +45,7 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
   return <><aside className="solo-toolbar" aria-label="ひとり試遊の操作">
     <div><strong>ひとり試遊中</strong><span>{game.day}日目・{phaseNames[game.phase]}</span></div>
     {game.phase !== 'finished' && <div className="solo-toolbar-actions">
-      {['vote','runoff'].includes(game.phase) && <label className="solo-target">自動投票先<select value={autoTarget} onChange={event => setAutoTarget(event.target.value)}><option value="">人狼を優先</option>{game.players.filter(player => player.alive).map(player => <option key={player.id} value={player.id}>{response.room.members.find(member => member.id === player.id)?.nickname}</option>)}</select></label>}
+      {['vote','runoff'].includes(game.phase) && <label className="solo-target">自動投票先<select value={autoTarget} onChange={event => setAutoTarget(event.target.value)}><option value="">人狼を優先</option>{game.day===1&&(game.phase==='vote'||game.runoffIds.includes('__no_execution__'))&&<option value="__no_execution__">誰も処刑しない</option>}{game.players.filter(player => player.alive).map(player => <option key={player.id} value={player.id}>{response.room.members.find(member => member.id === player.id)?.nickname}</option>)}</select></label>}
       <button className="secondary-button" disabled={incompleteBots === 0 || game.phase === 'discussion'} onClick={() => update(completeSoloPhase(sessionRef.current!, false, autoTarget || undefined))}>テスト4人を完了</button><button className="secondary-button" onClick={() => update(completeSoloPhase(sessionRef.current!, true, autoTarget || undefined))}>この段階を全員自動で進める</button></div>}
     <button className="text-button" onClick={() => update(null)}>役職を選び直す</button><button className="text-button" onClick={onExit}>試遊を終了</button>
   </aside><GameScreen key={game.id} room={response.room} onRoom={() => {}} onHome={() => update(null)} localDriver={driver}/></>;
