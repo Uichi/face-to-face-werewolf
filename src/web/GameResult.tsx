@@ -5,6 +5,7 @@ import type { Room } from './types.ts';
 import { teamOf } from '../domain/rules.ts';
 import { Scoreboard } from './Points.tsx';
 import { roleNames } from './types.ts';
+import PublicLog from './PublicLog.tsx';
 
 export default function GameResult({ game, room, children }: { game: GameView['public']; room: Room; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -41,6 +42,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
       <div className="final-counts"><span>生存人狼 <b>{wolves}人</b></span><span>生存人間 <b>{villagers}人</b></span></div>
       <p className="your-result">{selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
     </div>
+    <PublicLog events={game.publicLog??[]} room={room}/>
     <div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
     <div className="result-roles"><h3>全員の役職</h3>{game.players.map(p => <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? roleNames[p.role] : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>)}</div>
     {game.scores && <Scoreboard room={room} scores={game.scores}/>}

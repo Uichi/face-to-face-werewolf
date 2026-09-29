@@ -8,6 +8,7 @@ import { requestId } from './invite.ts';
 import { watchRoom } from './api.ts';
 import { currentTask } from './current-task.ts';
 import GameResult from './GameResult.tsx';
+import PublicLog from './PublicLog.tsx';
 import { NO_EXECUTION_ID, teamOf } from '../domain/rules.ts';
 import type { Role } from '../domain/rules.ts';
 
@@ -139,6 +140,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {seconds===0&&['vote','runoff','night'].includes(phase)&&<p className="inline-note">時間は終了しましたが、操作は引き続き受け付けています。自動で投票や能力使用はしません。</p>}
        {pub.voteResult&&['runoff','execution'].includes(phase)&&<div className="vote-counts"><h3>得票数</h3>{Object.entries(pub.voteResult.counts).map(([id,n])=><div key={id}><span>{name(id)}</span><b>{n}票</b></div>)}</div>}
      </section>
+     <PublicLog events={pub.publicLog??[]} room={room}/>
      <section className="panel"><div className="panel-heading"><h2>参加者</h2><span>{alive.length}人生存</span></div><div className="game-players">{pub.players.map(p=><div className={p.alive?'':'eliminated'} key={p.id}><span>{name(p.id)}{p.id===me?'（あなた）':''}</span><small>{p.alive?'生存':'脱落'}</small></div>)}</div></section>
      {host&&<section className="panel host-controls"><h2>主催者の操作</h2><div className="host-actions">
        {['discussion','vote','runoff','night'].includes(phase)&&<button className="secondary-button" disabled={busy} onClick={()=>void send('extend')}>60秒延長する</button>}

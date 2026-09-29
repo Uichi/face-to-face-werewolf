@@ -74,6 +74,7 @@ test('初日は「誰も処刑しない」へ投票でき、最多なら処刑�
   assert.equal(f.game.voteResult!.executedId, null);
   assert.equal(f.game.voteResult!.counts[NO_EXECUTION_ID], 3);
   assert.equal(f.game.players.every(player => player.alive), true);
+  assert.deepEqual(f.game.publicLog?.map(event => [event.day,event.kind]), [[1,'noExecution']]);
   f.confirmAll();
   assert.equal(f.game.phase, 'night');
 });
@@ -139,6 +140,8 @@ test('夜は能力なしの確認も必要、最後の確認で60秒を待たず
   f.time(1); f.send('v1', { type: 'confirm' });
   assert.equal(f.game.phase, 'morning');
   assert.equal(f.game.victimId, 'v1'); assert.equal(f.game.day, 2);
+  assert.deepEqual(f.game.publicLog?.map(event => [event.kind,event.playerId]), [['execution','v2'],['attack','v1']]);
+  assert.equal(viewFor(f.game, 'v0').public.publicLog.length, 2);
   assert.equal(viewFor(f.game, 's').private!.results.at(-1)!.isWolf, true);
   f.confirmAll(); assert.equal(f.game.phase, 'discussion');
   f.send('v0', { type: 'startVote' });

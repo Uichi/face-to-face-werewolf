@@ -6,6 +6,7 @@ import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateSc
 import type { VictoryPoints, Scoring, Score } from './scoring.ts';
 
 export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number; followedIds?: string[] };
+export type PublicLogEvent = { id: string; day: number; kind: 'execution' | 'noExecution' | 'attack' | 'noVictim'; playerId?: string; followedIds?: string[] };
 export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'finished';
 type Secret = { recipientId: string; targetId: string; isWolf: boolean; kind: 'initial' | 'seer' | 'medium'; day: number };
 type Action =
@@ -31,6 +32,7 @@ export type Game = {
   voteResult: VoteResult | null; victimId: string | null; winner: Team | null;
   scoring?: Scoring; scores?: Score[];
   lastElimination?: Elimination | null;
+  publicLog?: PublicLogEvent[];
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
 };
@@ -75,7 +77,7 @@ export function createGame(input: {
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
     selections: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
-    scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], receipts: {},
+    scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], publicLog: [], receipts: {},
   };
 }
 
@@ -108,11 +110,12 @@ function settle(game: Game, now: number, random: RandomIndex): void {
         const death = eliminate(game.players, result.executedId, 'execution');
         game.players = death.players;
         game.lastElimination = { playerId: result.executedId, cause: 'execution', day: game.day, ...(death.followedIds.length ? { followedIds: death.followedIds } : {}) };
+        (game.publicLog??=[]).push({ id: `execution-${game.phaseId}`, day: game.day, kind: 'execution', playerId: result.executedId, ...(death.followedIds.length ? { followedIds: [...death.followedIds] } : {}) });
         if (death.mediumResult) game.secrets.push({
           recipientId: death.mediumResult.mediumId, targetId: result.executedId,
           isWolf: death.mediumResult.isWolf, kind: 'medium', day: game.day,
         });
-      }
+      } else (game.publicLog??=[]).push({ id: `no-execution-${game.phaseId}`, day: game.day, kind: 'noExecution' });
       if (!finishIfWon(game, now)) enter(game, 'execution', now);
     }
   } else if (game.phase === 'night' && allDone(game)) {
@@ -130,7 +133,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     game.players = result.players;
     for (const p of alive(game)) recordPoint(game.scoring, p.id, 'survival');
     game.victimId = result.victimId;
-    if (result.victimId) game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day, ...(result.followedIds.length ? { followedIds: result.followedIds } : {}) };
+    if (result.victimId) {
+      game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day, ...(result.followedIds.length ? { followedIds: result.followedIds } : {}) };
+      (game.publicLog??=[]).push({ id: `attack-${game.phaseId}`, day: game.day, kind: 'attack', playerId: result.victimId, ...(result.followedIds.length ? { followedIds: [...result.followedIds] } : {}) });
+    } else (game.publicLog??=[]).push({ id: `no-victim-${game.phaseId}`, day: game.day, kind: 'noVictim' });
     if (result.divination) game.secrets.push({
       recipientId: result.divination.seerId, targetId: result.divination.targetId,
       isWolf: result.divination.isWolf, kind: 'seer', day: game.day,
@@ -245,6 +251,7 @@ export function viewFor(game: Game, viewerId: string) {
     requiredCount: alive(game).length,
     runoffIds: [...game.runoffIds], voteResult: structuredClone(game.voteResult), victimId: game.victimId,
     removals: structuredClone(game.removals),
+    publicLog: structuredClone(game.publicLog ?? []),
     followedIds: (game.phase === 'execution' && game.voteResult?.executedId === game.lastElimination?.playerId && game.lastElimination?.cause === 'execution') || (game.phase === 'morning' && game.victimId && game.lastElimination?.cause === 'attack') ? [...(game.lastElimination?.followedIds ?? [])] : [],
     ending: isFinished ? structuredClone(game.lastElimination ?? null) : null,
   };

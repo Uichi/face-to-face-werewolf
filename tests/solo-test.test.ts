@@ -59,6 +59,7 @@ test('恋人の処刑と襲撃で相方の後追いを表示する', () => {
     assert.equal(view.public.followedIds.length, 1);
     assert.equal(view.public.players.filter(player => !player.alive).length, 2);
     assert.equal(view.public.phase, kind === 'lover-execution' ? 'execution' : 'morning');
+    assert.deepEqual(view.public.publicLog.at(-1)?.followedIds, view.public.followedIds);
   }
 });
 
