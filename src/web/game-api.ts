@@ -9,7 +9,8 @@ export class GameError extends Error {
 }
 export async function gameCommand(action: string, payload: Record<string, unknown>): Promise<GameResponse> {
   if (!client) throw new GameError('接続先が設定されていません。');
-  let { data, error } = await client.rpc('game_command_thief', { action, payload });
+  let { data, error } = await client.rpc('game_command_host_results', { action, payload });
+  if (error?.code === 'PGRST202' || error?.code === '42883') ({ data, error } = await client.rpc('game_command_thief', { action, payload }));
   if (error?.code === 'PGRST202' || error?.code === '42883') ({ data, error } = await client.rpc('game_command_public_log', { action, payload }));
   if (error?.code === 'PGRST202' || error?.code === '42883') ({ data, error } = await client.rpc('game_command_first_day', { action, payload }));
   if (error?.code === 'PGRST202' || error?.code === '42883') ({ data, error } = await client.rpc('game_command_baker', { action, payload }));

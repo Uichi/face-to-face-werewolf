@@ -95,6 +95,7 @@ export function completeSoloPhase(session: SoloSession, includeViewer: boolean, 
   const startingPhase = session.game.phaseId;
   let next = session;
   if (next.game.phase === 'discussion') return includeViewer ? applySoloAction(next, 'startVote') : next;
+  if (['execution', 'morning'].includes(next.game.phase)) return includeViewer ? applySoloAction(next, 'next') : next;
   const actors = next.game.players.filter(player => player.alive && (includeViewer || player.id !== SOLO_VIEWER)).map(player => player.id);
   for (const actorId of actors) {
     if (next.game.phaseId !== startingPhase || next.game.phase === 'finished') break;

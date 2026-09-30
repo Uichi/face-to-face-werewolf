@@ -49,7 +49,7 @@ test('後追いを含めて勝敗を判定し、最終画面に2人を残す。�
 
 test('恋人は対象選択なしの夜確認、村側勝利時に脱落者にも5点。前の後追いを翌朝へ残さない',()=>{
  let g=base();g.phase='night';g.selections={w:'a',s:'w',k:'v'};g=settle(g);
- g=settle(g);assert.equal(g.phase,'discussion');assert.deepEqual(viewFor(g,'v').public.followedIds,[]);
+ g=applyCommand(g,{gameId:g.id,phaseId:g.phaseId,requestId:'next-morning',actorId:'v',action:{type:'next'}},0,()=>0);assert.equal(g.phase,'discussion');assert.deepEqual(viewFor(g,'v').public.followedIds,[]);
  g.phase='night';g.selections={w:'v',s:'w',k:'v'};g=settle(g);assert.equal(g.victimId,null);assert.deepEqual(viewFor(g,'v').public.followedIds,[]);
  g=applyCommand(g,{gameId:g.id,phaseId:g.phaseId,requestId:'remove-wolf',actorId:'v',action:{type:'remove',targetId:'w'}},0,()=>0);
  for(const id of ['a','b'])assert.equal(g.scores!.find(s=>s.playerId===id)!.victory,5);

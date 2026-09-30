@@ -35,7 +35,7 @@ function toNight(f: ReturnType<typeof fixture>) {
   const votes = Object.fromEntries(f.game.players.map(p => [p.id, p.id === 'v2' ? 'v1' : 'v2']));
   f.vote(votes);
   assert.equal(f.game.phase, 'execution');
-  f.confirmAll();
+  f.send('v0', { type: 'next' });
   assert.equal(f.game.phase, 'night');
 }
 
@@ -75,7 +75,7 @@ test('初日は「誰も処刑しない」へ投票でき、最多なら処刑�
   assert.equal(f.game.voteResult!.counts[NO_EXECUTION_ID], 3);
   assert.equal(f.game.players.every(player => player.alive), true);
   assert.deepEqual(f.game.publicLog?.map(event => [event.day,event.kind]), [[1,'noExecution']]);
-  f.confirmAll();
+  f.send('v0', { type: 'next' });
   assert.equal(f.game.phase, 'night');
 });
 
@@ -85,12 +85,12 @@ test('「誰も処刑しない」は初日だけ選べ、同票なら決選候�
   assert.equal(f.game.phase, 'runoff');
   assert.deepEqual(f.game.runoffIds.sort(), [NO_EXECUTION_ID, 'v2'].sort());
   f.vote({ v0: NO_EXECUTION_ID, v1: NO_EXECUTION_ID, v2: NO_EXECUTION_ID, w: 'v2', s: 'v2' });
-  f.confirmAll();
+  f.send('v0', { type: 'next' });
   for (const player of f.game.players.filter(player => player.alive)) {
     if (['wolf', 'seer', 'knight'].includes(player.role)) f.send(player.id, { type: 'select', targetId: player.role === 'wolf' ? 'v0' : 'w' });
     f.send(player.id, { type: 'confirm' });
   }
-  f.confirmAll();
+  f.send('v0', { type: 'next' });
   f.send('v0', { type: 'startVote' });
   assert.throws(() => f.send('v0', { type: 'select', targetId: NO_EXECUTION_ID }));
 });
@@ -120,8 +120,9 @@ test('同票→決選で候補者も投票し自己投票不可、再同票な�
   f.vote({ v0: 'v1', v1: 'v0', v2: 'v0', w: 'v1', s: 'v0' });
   assert.equal(f.game.phase, 'execution');
   assert.equal(f.game.voteResult!.executedId, 'v0');
-  // Dead players, including the host, are excluded from result confirmations.
-  f.confirmAll(); assert.equal(f.game.phase, 'night');
+  // The host keeps progression authority even when executed.
+  assert.throws(() => f.send('v1', { type: 'next' }));
+  f.send('v0', { type: 'next' }); assert.equal(f.game.phase, 'night');
 
   const g = fixture(); g.day(); g.send('v0', { type: 'remove', targetId: 'v2' });
   g.send('v0', { type: 'startVote' });
@@ -143,7 +144,8 @@ test('夜は能力なしの確認も必要、最後の確認で60秒を待たず
   assert.deepEqual(f.game.publicLog?.map(event => [event.kind,event.playerId]), [['execution','v2'],['attack','v1']]);
   assert.equal(viewFor(f.game, 'v0').public.publicLog.length, 2);
   assert.equal(viewFor(f.game, 's').private!.results.at(-1)!.isWolf, true);
-  f.confirmAll(); assert.equal(f.game.phase, 'discussion');
+  assert.throws(() => f.send('v0', { type: 'confirm' }));
+  f.send('v0', { type: 'next' }); assert.equal(f.game.phase, 'discussion');
   f.send('v0', { type: 'startVote' });
   f.vote({ v0: 'w', w: 'v0', s: 'w' });
   assert.equal(f.game.winner, 'village');

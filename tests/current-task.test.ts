@@ -10,8 +10,8 @@ test('投票の未選択・選択済み・確定済みを区別する',()=>{
 test('夜の隠れた能力選択の状態で上部の案内を変えない',()=>{
  assert.deepEqual(currentTask({...base,phase:'night',selected:false}),currentTask({...base,phase:'night',selected:true}));
 });
-test('脱落者には結果の確認を要求せず、送信失敗では完了と案内しない',()=>{
- assert.match(currentTask({...base,phase:'execution',alive:false}).detail,/確認や投票は不要/);
- assert.match(currentTask({...base,phase:'morning'}).title,/結果を確認/);
+test('公開結果は主催者の次へ操作を案内し、送信失敗では完了と案内しない',()=>{
+ assert.match(currentTask({...base,phase:'execution',alive:false,resultConfirmation:false}).detail,/主催者/);
+ assert.match(currentTask({...base,phase:'morning',resultConfirmation:false}).detail,/主催者/);
  assert.match(currentTask({...base,confirmed:true,retryPending:true}).title,/送信結果/);
 });

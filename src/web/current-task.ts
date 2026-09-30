@@ -12,6 +12,8 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
   if (s.busy) return task('操作を送信しています', '反映されるまで、そのままお待ちください。', true);
   if (s.offline) return task('再接続を待っています', '接続が戻ると、最新の状態を確認します。', true);
   if (s.phase === 'finished') return task('試合の結果を確認しましょう', '勝利陣営と、みんなの役職を振り返れます。');
+  if (s.phase === 'execution' && s.resultConfirmation === false) return task('処刑の結果を確認しましょう', '主催者が「次へ進む」を押すと、夜に進みます。');
+  if (s.phase === 'morning' && s.resultConfirmation === false) return task('朝の結果を確認しましょう', '主催者が「次へ進む」を押すと、議論が始まります。');
   if (!s.alive) return task('静かに見守りましょう', 'あなたは脱落しています。確認や投票は不要です。', true);
   if (s.confirmed) return task('あなたの操作は完了しました', 'ほかの生存者が完了すると、自動で次へ進みます。', true);
   switch (s.phase) {
@@ -25,7 +27,7 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
       ? task('投票を確定してください', '選んだだけでは投票は完了しません。「この人への投票を確定」を押してください。')
       : task(s.phase === 'runoff' ? '決選投票の相手を選んでください' : '投票する相手を選んでください', '相手を選んだあと、確定ボタンを押します。');
     case 'night': return task('夜の操作を完了してください', '「あなただけの情報」を開き、中の案内に沿って確認・確定してください。');
-    case 'execution': if (s.resultConfirmation === false) return task('処刑の結果を確認しましょう', '主催者が「次へ進む」を押すと、夜に進みます。'); return task('処刑の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に夜へ進みます。');
-    case 'morning': if (s.resultConfirmation === false) return task('朝の結果を確認しましょう', '主催者が「次へ進む」を押すと、議論が始まります。'); return task('朝の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に議論が始まります。');
+    case 'execution': return task('処刑の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に夜へ進みます。');
+    case 'morning': return task('朝の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に議論が始まります。');
   }
 }
