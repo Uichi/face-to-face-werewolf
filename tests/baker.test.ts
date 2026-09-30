@@ -23,7 +23,7 @@ test('パン屋は村側で0〜1人、パンは6種類', () => {
   assert.throws(() => validateComposition(5, { ...composition, villager: 0, baker: 2 }));
 });
 
-test('初夜に選んだパンが0日目のパンとして届く', () => {
+test('初夜に選んだパンが最初の昼に届く', () => {
   const f = fixture();
   for (const player of f.game.players) f.send(player.id, { type: 'confirm' });
   const baker = f.game.players.find(player => player.role === 'baker')!;

@@ -138,8 +138,8 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
      </div>}</section>}
      <section className="panel phase-panel">
        {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職を確認してから、確認完了を押してください。</p>{thiefChoice&&canSelect&&<><h3>役職を奪う人を選ぶ</h3><p>確定すると変更できません。交換はほかの人には知らされません。</p>{selector}</>}{self.alive&&confirmButton}</>}
-       {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛・占いはありません。パン屋は0日目のパンを選び、怪盗は交換後の役職を「あなただけの情報」で確認できます。</p>{self.alive&&!breadChoice&&confirmButton}</>}
-       {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><span aria-hidden="true">🥖</span><div><strong>0日目の{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}<p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
+       {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛・占いはありません。パン屋は最初に届けるパンを選び、怪盗は交換後の役職を「あなただけの情報」で確認できます。</p>{self.alive&&!breadChoice&&confirmButton}</>}
+       {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><span aria-hidden="true">🥖</span><div><strong>{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}<p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
        {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
        {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
        {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:noExecutionWon?'投票の結果、誰も処刑されませんでした':'同票のため、処刑はありません'}</h2><p>{pub.voteResult?.executedId?'脱落した人の役職は、試合終了まで公開されません。':'今夜へ進みます。'}</p></>}
