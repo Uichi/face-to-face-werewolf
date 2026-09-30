@@ -1,4 +1,4 @@
-import { applyCommand, createGame, viewFor } from '../domain/game.ts';
+import { applyCommand, BREAD_TYPES, createGame, viewFor } from '../domain/game.ts';
 import type { Command, Game, Phase } from '../domain/game.ts';
 import { DEFAULT_COMPOSITIONS, NO_EXECUTION_ID } from '../domain/rules.ts';
 import type { Composition, Role } from '../domain/rules.ts';
@@ -30,7 +30,7 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, thiefRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -78,9 +78,10 @@ export function applySoloAction(session: SoloSession, action: string, payload: R
   throw new Error('この操作は試遊モードでは使えません。');
 }
 
-const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
+const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (['firstNight','night'].includes(phase) && role === 'baker') || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
 function targetFor(game: Game, actorId: string, preferredTargetId?: string): string {
   const actor = game.players.find(player => player.id === actorId)!;
+  if ((actor.apparentRole ?? actor.role) === 'baker' && ['firstNight','night'].includes(game.phase)) return BREAD_TYPES[Math.floor(Math.random() * BREAD_TYPES.length)]!;
   const candidates = game.players.filter(player => player.alive && player.id !== actorId
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))
   );
@@ -218,6 +219,7 @@ export function createCheckScenario(kind: CheckScenario): SoloSession {
     for (const actor of session.game.players.filter(player => player.alive)) {
       if (actor.role === 'wolf') session = applySoloAction(session, 'select', { targetId: attacked.id }, actor.id);
       else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: kind === 'seer-wolf' ? wolf.id : targetFor(session.game, actor.id) }, actor.id);
+      else if ((actor.apparentRole ?? actor.role) === 'baker') session = applySoloAction(session, 'select', { targetId: targetFor(session.game, actor.id) }, actor.id);
       session = applySoloAction(session, 'confirm', {}, actor.id);
     }
     return session;

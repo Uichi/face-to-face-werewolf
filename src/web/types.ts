@@ -6,6 +6,7 @@ export type Room = {
   revision: number; discussionMinutes: number; composition: Composition | null;
   loverRole?: boolean;
   bakerRole?: boolean;
+  breadChoices?: boolean;
   thiefRole?: boolean;
   firstDayNoExecution?: boolean;
   victoryPoints?: VictoryPoints;

@@ -21,7 +21,7 @@ const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
 const names = ['あなた', 'あおい', 'はる', 'みなと', 'ひなた'];
 const demoRoom = (): Room => ({ id: 'preview', code: 'A7C92F4B10', hostId: 'p0', viewerId: 'p0', status: 'waiting', revision: 1,
-  loverRole: true, bakerRole: true, thiefRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
+  loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
   members: names.map((nickname, i) => ({ id: `p${i}`, nickname, connected: true })) });
 function readSaved(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key: string, value: string | null) { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* The auth layer reports storage failures. */ } }
