@@ -68,7 +68,8 @@ export async function membership(action: 'remove' | 'leave', payload: Record<str
 }
 export async function lobby(action: string, payload: Record<string, unknown>): Promise<Room> {
   if (!client) throw new Error('接続先が設定されていません。');
-  let { data, error } = await client.rpc('lobby_command_thief', { action, payload });
+  let { data, error } = await client.rpc('lobby_command_guard', { action, payload });
+  if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_thief', { action, payload }));
   if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_baker', { action, payload }));
   if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command', { action, payload }));
   const access = siteAccessError(error); if (access) throw access;

@@ -37,6 +37,8 @@ export type Game = {
   lastElimination?: Elimination | null;
   publicLog?: PublicLogEvent[];
   breadDelivery?: { day: number; breadType: BreadType } | null;
+  consecutiveGuard: boolean;
+  lastGuardTargets: Record<string, string>;
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
 };
@@ -75,7 +77,7 @@ function finishIfWon(game: Game, now: number): boolean {
 }
 
 export function createGame(input: {
-  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints;
+  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints; consecutiveGuard?: boolean;
 }, now: number, random: RandomIndex): Game {
   const minutes = input.discussionMinutes ?? 3;
   check(input.id.length > 0 && input.playerIds.includes(input.hostId), '試合・主催者が不正です');
@@ -88,7 +90,8 @@ export function createGame(input: {
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
     selections: {}, attackStrengths: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
-    scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], publicLog: [], breadDelivery: null, receipts: {},
+    scoring: { victoryPoints, stats: {} }, winner: null, secrets: [], removals: [], publicLog: [], breadDelivery: null,
+    consecutiveGuard: input.consecutiveGuard ?? true, lastGuardTargets: {}, receipts: {},
   };
 }
 
@@ -148,6 +151,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
   } else if (game.phase === 'night' && allDone(game)) {
     const actionOf = (p: Player) => ({ actorId: p.id, targetId: game.selections[p.id]! });
     const living = alive(game);
+    for (const player of living.filter(player => shownRole(player) === 'knight')) {
+      const guarded = game.selections[player.id];
+      if (guarded) game.lastGuardTargets[player.id] = guarded;
+    }
     const seer = living.find(p => p.role === 'seer');
     const knight = living.find(p => p.role === 'knight');
     const result = resolveNight(game.players, {
@@ -199,6 +206,8 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
   check(previous.phase !== 'finished', '試合は終了しています');
   const game = structuredClone(previous);
   game.attackStrengths ??= {};
+  game.consecutiveGuard ??= true;
+  game.lastGuardTargets ??= {};
   const { action, actorId } = command;
   const actor = game.players.find(p => p.id === actorId);
   if (action.type === 'tick') {
@@ -223,6 +232,9 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         if (game.phase === 'night') {
           check(bread || target, '対象が不正です');
           check(hasAbility(actor) || choosesBread(actor, game.phase), '選択する能力がありません');
+          if (shownRole(actor) === 'knight' && !game.consecutiveGuard) {
+            check(game.lastGuardTargets[actor.id] !== action.targetId, '前の夜と同じ人は続けて護衛できません');
+          }
           if (shownRole(actor) === 'wolf') {
             check(action.strength === undefined || [1, 2, 3].includes(action.strength), '襲撃の希望度を選んでください');
             game.attackStrengths[actor.id] = action.strength ?? 2;
@@ -295,7 +307,7 @@ export function viewFor(game: Game, viewerId: string) {
     resultConfirmation: false,
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
-    deadline: game.deadline, winner: game.winner,
+    deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role } : {}) })),
     composition: Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
     breadDelivered: game.phase === 'morning' ? !!game.breadDelivery : game.phase === 'discussion' && game.day === 1 ? game.breadDelivery?.day === 0 : false,
@@ -319,6 +331,7 @@ export function viewFor(game: Game, viewerId: string) {
         ? game.players.find(p => p.initialRole === 'lover' && p.id !== viewerId)?.id ?? null
         : game.players.find(p => p.role === 'lover' && p.id !== viewerId)?.id ?? null) : null, confirmed: game.confirmed.includes(viewerId),
       selection: Object.hasOwn(game.selections, viewerId) ? game.selections[viewerId] : null,
+      lastGuardTargetId: shownRole(viewer) === 'knight' ? game.lastGuardTargets[viewerId] ?? null : null,
       attackStrength: game.attackStrengths[viewerId] ?? null,
       results: structuredClone(game.secrets.filter(s => s.recipientId === viewerId)),
     },

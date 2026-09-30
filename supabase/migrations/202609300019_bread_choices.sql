@@ -6,7 +6,7 @@ create or replace function app_private.bread_choice_response(result jsonb,room_i
 language plpgsql security definer set search_path=''as $$
 declare g jsonb;delivery jsonb;delivered boolean:=false;
 begin
- select state into g from app_private.games where room_id=bread_choice_response.room_id;
+ select games.state into g from app_private.games games where games.room_id=bread_choice_response.room_id;
  result:=jsonb_set(result,'{room,breadChoices}','true'::jsonb,true);
  if result->'game'is null or g is null then return result;end if;
  delivery:=g->'breadDelivery';

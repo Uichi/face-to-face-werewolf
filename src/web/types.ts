@@ -9,6 +9,7 @@ export type Room = {
   breadChoices?: boolean;
   thiefRole?: boolean;
   firstDayNoExecution?: boolean;
+  consecutiveGuard?: boolean;
   victoryPoints?: VictoryPoints;
   customComposition: boolean; members: Member[];
 };

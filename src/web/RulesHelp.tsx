@@ -7,13 +7,13 @@ import { roleNames } from './types.ts';
 import { ScoringRules } from './Points.tsx';
 
 // Accept public settings only. Player identities, role assignments and actions never enter this component.
-export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean };
+export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; consecutiveGuard?: boolean };
 const roles: { role: Role; team: string; action: string; notes: string }[] = [
   { role: 'villager', team: '村側', action: '会話と投票で、人狼を見つけましょう。', notes: '特別な能力はありません。夜も「あなただけの情報」を開き、確認を完了します。' },
   { role: 'wolf', team: '人狼側', action: '夜に自分以外の生存者1人と希望度1〜3を選びます。', notes: '仲間も対象にできます。対象別の希望度合計が最大の人を襲撃し、同点なら無作為に決まります。仲間への襲撃も成立します。他の人狼の選択や集計は表示されません。' },
   { role: 'seer', team: '村側', action: '夜に自分以外の生存者1人を選び、人狼かどうか調べます。', notes: '対象を選んで確定します。同じ人を再び占えます。初夜の白通知はありません。結果は本人だけが確認できます。' },
   { role: 'medium', team: '村側', action: '処刑された人が人狼かどうか、処刑後に分かります。', notes: '対象を選ぶ操作はありません。処刑なし・襲撃・途中退場・後追いでは霊媒結果は出ません。結果は本人だけに表示され、夜は確認を完了します。' },
-  { role: 'knight', team: '村側', action: '夜に自分以外の生存者1人を護衛します。', notes: '対象を選んで確定します。同じ人を連続して護衛できます。襲撃先と一致すれば犠牲者は出ません。護衛成功の理由や対象は公開されません。初夜は護衛しません。' },
+  { role: 'knight', team: '村側', action: '夜に自分以外の生存者1人を護衛します。', notes: '対象を選んで確定します。連続護衛できるかは部屋の設定に従います。襲撃先と一致すれば犠牲者は出ません。護衛成功の理由や対象は公開されません。初夜は護衛しません。' },
   { role: 'madman', team: '人狼側', action: '人狼を助ける、人間の役職です。人狼側が勝てば狂人も勝利します。', notes: '人狼と互いの正体は分かりません。占い・霊媒では「人狼ではない」と出ます。勝敗判定の人数では人間として数えます。夜の能力はなく、確認だけ行います。' },
   { role: 'lover', team: '村側', action: '2人セットの独立した役職で、お互いが誰か分かります。', notes: '片方が処刑・襲撃・途中退場で脱落すると、もう片方も後追いで脱落します。襲撃対象への護衛が成功すれば2人とも生存しますが、相方だけの護衛では後追いを防げません。占い・霊媒は白。夜は確認のみで、村側の勝利を目指します。' },
   { role: 'baker', team: '村側', action: '初夜と毎晩、6種類からパンを選んで全員へ届けます。', notes: '最初の昼にもパンが届きます。通常の夜に襲撃された場合、その夜に選んだパンは届きません。パン屋の名前は公開されず、占い・霊媒では白です。' },
@@ -45,6 +45,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
         </article>)}</div><p className="small-note">本人の役職や仲間の名前は、ゲーム画面の「あなただけの情報」で確認してください。</p>
       </section>}
       {section === 'flow' && <section aria-labelledby="rules-flow-title"><h3 id="rules-flow-title">ゲームの進め方</h3>
+        {settings?.consecutiveGuard !== undefined && <p className="inline-note">この部屋の騎士の連続護衛：<strong>{settings.consecutiveGuard ? 'あり' : 'なし'}</strong></p>}
         <ol className="rules-flow-list">
           <li><h4>役職を確認する</h4><p>自分の役職を確認し、「役職を確認しました」を押します。生存者全員の確認で初夜へ進みます。</p></li>
           <li><h4>初夜の確認</h4><p>襲撃・護衛・占いはありません。怪盗は交換後の役職を確認します。全員が自分の情報を確認して、夜の確認を完了します。</p></li>
