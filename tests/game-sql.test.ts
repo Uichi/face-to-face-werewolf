@@ -396,6 +396,22 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    }
    assert.equal(g.phase,'execution',JSON.stringify({voteResult:g.voteResult,selections:g.selections,winner:g.winner,players:g.players}));assert.equal(g.voteResult!.executedId,null);assert.equal(g.voteResult!.counts.__no_execution__,3);assert.ok(g.players.every(p=>p.alive));
   });
+  await t.test('複数人が確定前に「誰も処刑しない」をそれぞれ選択できる',async()=>{
+   const f=await setup(5);let g=await f.state();
+   for(const p of g.players)await f.call(p.id,'confirm');
+   for(const p of g.players)await f.call(p.id,'confirm');
+   await f.call(f.host,'startVote');g=await f.state();
+   const voters=g.players.slice(0,2);
+   for(const voter of voters){
+    await user(f.memberUsers.get(voter.id)!);
+    const response=await raw('game_command_first_day','select',{roomId:f.roomId,gameId:g.id,phaseId:g.phaseId,requestId:randomUUID(),targetId:'__no_execution__'});
+    assert.equal(response.game!.private!.selection,'__no_execution__');
+   }
+   g=await f.state();
+   assert.equal(g.selections[voters[0]!.id],'__no_execution__');
+   assert.equal(g.selections[voters[1]!.id],'__no_execution__');
+   assert.deepEqual(g.confirmed,[]);
+  });
   await t.test('公開ログは処刑を保存し、全参加者へ同じ内容を返す',async()=>{
    const f=await setup(5);await f.allConfirm();await f.allConfirm();await f.call(f.host,'startVote');
    let g=await f.state();const living=g.players.filter(p=>p.alive),wolf=living.find(p=>p.role==='wolf')!;
