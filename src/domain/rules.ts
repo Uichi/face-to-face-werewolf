@@ -2,7 +2,7 @@
 export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief';
 export type Team = 'village' | 'wolves';
 export type Composition = Record<Exclude<Role, 'thief'>, number> & { thief?: number };
-export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean };
+export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean; wolfbound?: boolean; initialWolfbound?: boolean };
 export type Choice = { actorId: string; targetId: string };
 export type AttackChoice = Choice & { strength?: 1 | 2 | 3 };
 // Production callers must supply a cryptographically secure uniform integer source.
@@ -64,7 +64,7 @@ export function getWinner(players: readonly Player[]): Team | null {
 export function initialWhite(players: readonly Player[], random: RandomIndex): { seerId: string; targetId: string; isWolf: false } | null {
   const seer = players.find(p => p.alive && p.role === 'seer');
   if (!seer) return null;
-  const target = pick(players.filter(p => p.alive && p.role !== 'wolf' && p.id !== seer.id), random);
+  const target = pick(players.filter(p => p.alive && p.role !== 'wolf' && p.wolfbound !== true && p.id !== seer.id), random);
   return { seerId: seer.id, targetId: target.id, isWolf: false };
 }
 
@@ -133,7 +133,7 @@ export function resolveNight(players: readonly Player[], actions: NightActions, 
   const death = victimId ? eliminate(players, victimId, 'attack') : null;
   const nextPlayers = death?.players ?? players.map(p => ({ ...p }));
   // The caller must filter this private result by recipient and life status.
-  const divination = divined ? { seerId: actions.divination!.actorId, targetId: divined.id, isWolf: divined.role === 'wolf' } : null;
+  const divination = divined ? { seerId: actions.divination!.actorId, targetId: divined.id, isWolf: divined.role === 'wolf' || divined.wolfbound === true } : null;
   return { players: nextPlayers, victimId, followedIds: death?.followedIds ?? [], divination, winner: getWinner(nextPlayers) };
 }
 

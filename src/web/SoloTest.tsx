@@ -38,6 +38,9 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
       <button className="secondary-button" onClick={() => update(createCheckScenario('no-execution'))}>初日「誰も処刑しない」→ 処刑なし</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('no-execution-runoff'))}>処刑なしと同票 → 決選投票</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('seer-wolf'))}>占い師が人狼を発見</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('seer-wolfbound'))}>狼憑きを占う → 人狼判定</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('medium-wolfbound'))}>狼憑きを処刑 → 霊媒は村人判定</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('thief-wolfbound'))}>怪盗が狼憑きを奪う → 村人表示</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('baker-alive'))}>パン屋が生存 → パンが届く朝</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('baker-dead'))}>パン屋が襲撃 → パンが届かない朝</button>
     </div>

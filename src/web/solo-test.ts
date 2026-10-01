@@ -30,7 +30,7 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, firstDayNoExecution: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -142,8 +142,39 @@ export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession 
   return session;
 }
 
-export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf';
+export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf' | 'seer-wolfbound' | 'medium-wolfbound' | 'thief-wolfbound';
 export function createCheckScenario(kind: CheckScenario): SoloSession {
+  if (kind === 'thief-wolfbound') {
+    let session = createSoloSession('thief', 10);
+    const target = session.game.players.find(player => player.role === 'villager' && player.id !== SOLO_VIEWER)!;
+    target.wolfbound = target.initialWolfbound = true;
+    session = applySoloAction(session, 'select', { targetId: target.id });
+    for (const player of session.game.players) session = applySoloAction(session, 'confirm', {}, player.id);
+    return session;
+  }
+  if (kind === 'medium-wolfbound') {
+    let session = prepareVote(createSoloSession('medium'));
+    const target = session.game.players.find(player => player.role === 'villager' && player.id !== SOLO_VIEWER)!;
+    target.wolfbound = target.initialWolfbound = true;
+    const wolf = session.game.players.find(player => player.role === 'wolf')!;
+    for (const actor of session.game.players) {
+      session = applySoloAction(session, 'select', { targetId: actor.id === target.id ? wolf.id : target.id }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
+  if (kind === 'seer-wolfbound') {
+    let session = prepareNight(createSoloSession('seer'));
+    const target = session.game.players.find(player => player.role === 'villager' && player.id !== SOLO_VIEWER)!;
+    target.wolfbound = target.initialWolfbound = true;
+    const attacked = session.game.players.find(player => player.role === 'villager' && player.id !== target.id)!;
+    for (const actor of session.game.players.filter(player => player.alive)) {
+      if (actor.role === 'wolf') session = applySoloAction(session, 'select', { targetId: attacked.id }, actor.id);
+      else if (actor.role === 'seer') session = applySoloAction(session, 'select', { targetId: target.id }, actor.id);
+      session = applySoloAction(session, 'confirm', {}, actor.id);
+    }
+    return session;
+  }
   if (kind === 'lover-execution') {
     let session = prepareVote(createSoloSession('lover'));
     const target = session.game.players.find(player => player.role === 'lover' && player.id !== SOLO_VIEWER)!;

@@ -77,7 +77,7 @@ function finishIfWon(game: Game, now: number): boolean {
 }
 
 export function createGame(input: {
-  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints; consecutiveGuard?: boolean;
+  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints; consecutiveGuard?: boolean; wolfboundEnabled?: boolean;
 }, now: number, random: RandomIndex): Game {
   const minutes = input.discussionMinutes ?? 3;
   check(input.id.length > 0 && input.playerIds.includes(input.hostId), '試合・主催者が不正です');
@@ -86,6 +86,14 @@ export function createGame(input: {
   const victoryPoints = { ...(input.victoryPoints ?? DEFAULT_VICTORY_POINTS) };
   validateVictoryPoints(victoryPoints);
   const players = assignRoles(input.playerIds, input.composition, random);
+  if (input.wolfboundEnabled) {
+    check((input.composition.villager ?? 0) >= 1, '狼憑きを使用するには村人が1人以上必要です');
+    if (random(2) === 1) {
+      const villagers = players.filter(player => player.role === 'villager');
+      const chosen = villagers[random(villagers.length)]!;
+      chosen.wolfbound = chosen.initialWolfbound = true;
+    }
+  }
   return {
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
@@ -109,6 +117,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       // The target keeps seeing and operating the role they received at the start.
       target.apparentRole = target.initialRole ?? stolenRole;
       target.decoy = true;
+      if (target.wolfbound) {
+        thief.wolfbound = true;
+        target.wolfbound = false;
+      }
     }
     enter(game, 'firstNight', now);
   } else if (game.phase === 'firstNight' && allDone(game)) {
@@ -162,7 +174,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       divination: seer ? actionOf(seer) : null,
       protection: knight ? actionOf(knight) : null,
     }, random);
-    if (result.divination?.isWolf) recordPoint(game.scoring, result.divination.seerId, 'contribution', result.divination.targetId);
+    if (result.divination?.isWolf && living.find(player => player.id === result.divination!.targetId)?.role === 'wolf') recordPoint(game.scoring, result.divination.seerId, 'contribution', result.divination.targetId);
     if (knight && result.victimId === null) recordPoint(game.scoring, knight.id, 'contribution');
     game.players = result.players;
     const baker = living.find(p => p.role === 'baker');
@@ -308,7 +320,7 @@ export function viewFor(game: Game, viewerId: string) {
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
-    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role } : {}) })),
+    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true } : {}) })),
     composition: Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
     breadDelivered: game.phase === 'morning' ? !!game.breadDelivery : game.phase === 'discussion' && game.day === 1 ? game.breadDelivery?.day === 0 : false,
     breadDelivery: structuredClone(game.breadDelivery ?? null),

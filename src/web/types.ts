@@ -10,6 +10,7 @@ export type Room = {
   thiefRole?: boolean;
   firstDayNoExecution?: boolean;
   consecutiveGuard?: boolean;
+  wolfboundEnabled?: boolean;
   victoryPoints?: VictoryPoints;
   customComposition: boolean; members: Member[];
 };
