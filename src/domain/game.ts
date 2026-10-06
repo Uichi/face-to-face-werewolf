@@ -5,11 +5,11 @@ import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
 import type { VictoryPoints, Scoring, Score } from './scoring.ts';
 
-export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect'; day: number; followedIds?: string[] };
+export type Elimination = { playerId: string; cause: 'execution' | 'attack' | 'disconnect' | 'shot'; day: number; followedIds?: string[] };
 export const BREAD_TYPES = ['shokupan', 'croissant', 'melonpan', 'currypan', 'anpan', 'surprise'] as const;
 export type BreadType = typeof BREAD_TYPES[number];
-export type PublicLogEvent = { id: string; day: number; kind: 'execution' | 'noExecution' | 'attack' | 'noVictim' | 'bread'; playerId?: string; followedIds?: string[]; breadType?: BreadType };
-export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'finished';
+export type PublicLogEvent = { id: string; day: number; kind: 'execution' | 'noExecution' | 'attack' | 'noVictim' | 'bread' | 'hunterReady' | 'shot' | 'shotCancelled'; actorId?: string; reason?: string; playerId?: string; followedIds?: string[]; breadType?: BreadType };
+export type Phase = 'roles' | 'firstNight' | 'discussion' | 'vote' | 'runoff' | 'execution' | 'night' | 'morning' | 'hunter' | 'finished';
 type Secret = { recipientId: string; targetId: string; isWolf: boolean; kind: 'initial' | 'seer' | 'medium'; day: number };
 type Action =
   | { type: 'confirm' }
@@ -18,6 +18,7 @@ type Action =
   | { type: 'startVote' }
   | { type: 'extend' }
   | { type: 'remove'; targetId: string }
+  | { type: 'cancelShot' }
   | { type: 'tick' };
 export type Command = {
   gameId: string;
@@ -39,6 +40,7 @@ export type Game = {
   breadDelivery?: { day: number; breadType: BreadType } | null;
   consecutiveGuard: boolean;
   lastGuardTargets: Record<string, string>;
+  hunterPending?: { actorId: string; resume: 'execution' | 'morning'; day: number; breadChoice?: string; bakerId?: string };
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
 };
@@ -64,7 +66,7 @@ function enter(game: Game, phase: Phase, now: number): void {
   game.confirmed = [];
   game.runoffIds = [];
   game.deadline = phase === 'discussion' ? now + game.discussionMs
-    : ['vote', 'runoff', 'night'].includes(phase) ? now + 60_000 : null;
+    : ['vote', 'runoff', 'night', 'hunter'].includes(phase) ? now + 60_000 : null;
 }
 
 function finishIfWon(game: Game, now: number): boolean {
@@ -74,6 +76,40 @@ function finishIfWon(game: Game, now: number): boolean {
     enter(game, 'finished', now);
   }
   return game.winner !== null;
+}
+
+function awaitHunter(game: Game, actorId: string | null | undefined, resume: 'execution' | 'morning', now: number, bread?: { bakerId: string; breadChoice: string }): boolean {
+  if (!actorId || game.players.find(p => p.id === actorId)?.role !== 'hunter') return false;
+  game.hunterPending = { actorId, resume, day: game.day, ...bread };
+  if (resume === 'morning') game.breadDelivery = null;
+  (game.publicLog ??= []).push({ id: `hunter-ready-${game.phaseId}`, day: game.day, kind: 'hunterReady', playerId: actorId });
+  enter(game, 'hunter', now);
+  return true;
+}
+function finishNight(game: Game, random: RandomIndex, bread?: { bakerId?: string; breadChoice?: string }): void {
+  game.breadDelivery = null;
+  if (bread?.bakerId && bread.breadChoice && game.players.some(p => p.id === bread.bakerId && p.alive && p.role === 'baker')) {
+    const breadType = resolveBread(bread.breadChoice, random);
+    game.breadDelivery = { day: game.day, breadType };
+    (game.publicLog ??= []).push({ id: `bread-${game.day}-${game.phaseId}`, day: game.day, kind: 'bread', breadType });
+  }
+  for (const p of alive(game)) recordPoint(game.scoring, p.id, 'survival');
+  game.day++;
+}
+function resolveShot(game: Game, now: number, random: RandomIndex, cancelled = false): void {
+  const pending = game.hunterPending!;
+  if (cancelled) (game.publicLog ??= []).push({ id: `shot-cancel-${game.phaseId}`, day: pending.day, kind: 'shotCancelled', actorId: pending.actorId, reason: alive(game).length ? '時間切れ後に主催者が発砲を中止しました' : '発砲できる生存者がいないため中止しました' });
+  else {
+    const targetId = game.selections[pending.actorId]!;
+    if (game.players.find(p => p.id === targetId)?.role === 'wolf') recordPoint(game.scoring, pending.actorId, 'contribution');
+    const death = eliminate(game.players, targetId, 'shot');
+    game.players = death.players;
+    game.lastElimination = { playerId: targetId, cause: 'shot', day: pending.day, followedIds: death.followedIds };
+    (game.publicLog ??= []).push({ id: `shot-${game.phaseId}`, day: pending.day, kind: 'shot', actorId: pending.actorId, playerId: targetId, followedIds: death.followedIds });
+  }
+  if (pending.resume === 'morning') finishNight(game, random, pending);
+  delete game.hunterPending;
+  if (!finishIfWon(game, now)) enter(game, pending.resume, now);
 }
 
 export function createGame(input: {
@@ -158,7 +194,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
           game.secrets.push({ recipientId: p.id, targetId: result.executedId, isWolf: false, kind: 'medium', day: game.day });
         }
       } else (game.publicLog??=[]).push({ id: `no-execution-${game.phaseId}`, day: game.day, kind: 'noExecution' });
-      if (!finishIfWon(game, now)) enter(game, 'execution', now);
+      if (!awaitHunter(game, result.executedId, 'execution', now) && !finishIfWon(game, now)) enter(game, 'execution', now);
     }
   } else if (game.phase === 'night' && allDone(game)) {
     const actionOf = (p: Player) => ({ actorId: p.id, targetId: game.selections[p.id]! });
@@ -178,13 +214,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     if (knight && result.victimId === null) recordPoint(game.scoring, knight.id, 'contribution');
     game.players = result.players;
     const baker = living.find(p => p.role === 'baker');
-    const survivingBaker = baker && game.players.find(p => p.id === baker.id)?.alive;
-    if (baker && survivingBaker) {
-      const breadType = resolveBread(game.selections[baker.id]!, random);
-      game.breadDelivery = { day: game.day, breadType };
-      (game.publicLog??=[]).push({ id: `bread-${game.day}-${game.phaseId}`, day: game.day, kind: 'bread', breadType });
-    } else game.breadDelivery = null;
-    for (const p of alive(game)) recordPoint(game.scoring, p.id, 'survival');
+    const bread = baker ? { bakerId: baker.id, breadChoice: game.selections[baker.id]! } : undefined;
     game.victimId = result.victimId;
     if (result.victimId) {
       game.lastElimination = { playerId: result.victimId, cause: 'attack', day: game.day, ...(result.followedIds.length ? { followedIds: result.followedIds } : {}) };
@@ -197,8 +227,10 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     for (const p of living.filter(p => shownRole(p) === 'seer' && p.role !== 'seer')) {
       game.secrets.push({ recipientId: p.id, targetId: game.selections[p.id]!, isWolf: false, kind: 'seer', day: game.day });
     }
-    game.day++;
-    if (!finishIfWon(game, now)) enter(game, 'morning', now);
+    if (!awaitHunter(game, result.victimId, 'morning', now, bread)) {
+      finishNight(game, random, bread);
+      if (!finishIfWon(game, now)) enter(game, 'morning', now);
+    }
   }
 }
 
@@ -226,13 +258,18 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
     check(actorId === null, '時計の処理はサーバー専用です');
   } else {
     check(actor, '参加者ではありません');
-    if (['next', 'startVote', 'extend', 'remove'].includes(action.type)) {
+    if (['next', 'startVote', 'extend', 'remove', 'cancelShot'].includes(action.type)) {
       check(actor.id === game.hostId, '主催者のみ操作できます');
     } else {
-      check(actor.alive, '脱落者は操作できません');
+      check(actor.alive || (game.phase === 'hunter' && game.hunterPending?.actorId === actor.id), '脱落者は操作できません');
+      if (game.phase === 'hunter') check(game.hunterPending?.actorId === actor.id, '狩人本人だけが発砲できます');
     }
     switch (action.type) {
       case 'select': {
+        if (game.phase === 'hunter') {
+          check(game.players.some(p => p.id === action.targetId && p.alive), '対象が不正です');
+          game.selections[actor.id] = action.targetId; break;
+        }
         check(['roles', 'firstNight', 'vote', 'runoff', 'night'].includes(game.phase), '対象を選べる段階ではありません');
         check(!game.confirmed.includes(actor.id), '確定済みです');
         const bread = choosesBread(actor, game.phase) && BREAD_TYPES.includes(action.targetId as BreadType);
@@ -257,6 +294,10 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         break;
       }
       case 'confirm': {
+        if (game.phase === 'hunter') {
+          check(game.selections[actor.id], '先に対象を選んでください');
+          resolveShot(game, now, random); break;
+        }
         check(['roles', 'firstNight', 'vote', 'runoff', 'night'].includes(game.phase), 'この結果は主催者が次へ進めます');
         if ((game.phase === 'roles' && shownRole(actor) === 'thief') || ['vote', 'runoff'].includes(game.phase) || (game.phase === 'night' && (hasAbility(actor) || choosesBread(actor, game.phase))) || choosesBread(actor, game.phase)) {
           check(Object.hasOwn(game.selections, actor.id), '先に対象を選んでください');
@@ -278,15 +319,23 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         enter(game, 'vote', now);
         break;
       case 'extend':
-        check(['discussion', 'vote', 'runoff', 'night'].includes(game.phase), '延長できる段階ではありません');
+        check(['discussion', 'vote', 'runoff', 'night', 'hunter'].includes(game.phase), '延長できる段階ではありません');
         game.deadline = Math.max(now, game.deadline!) + 60_000;
         break;
+      case 'cancelShot':
+        check(game.phase === 'hunter' && now >= game.deadline!, '発砲の期限後だけ中止できます');
+        resolveShot(game, now, random, true); break;
       case 'remove': {
         const death = eliminate(game.players, action.targetId, 'disconnect');
         game.players = death.players;
-        game.lastElimination = { playerId: action.targetId, cause: 'disconnect', day: game.day, ...(death.followedIds.length ? { followedIds: death.followedIds } : {}) };
+        if (game.phase !== 'hunter') game.lastElimination = { playerId: action.targetId, cause: 'disconnect', day: game.day, ...(death.followedIds.length ? { followedIds: death.followedIds } : {}) };
         game.removals.push(...[action.targetId, ...death.followedIds].map(playerId => ({ playerId, day: game.day })));
-        if (!finishIfWon(game, now)) {
+        if (game.phase === 'hunter') {
+          const selected = game.selections[game.hunterPending!.actorId];
+          if (!alive(game).some(p => p.id === selected)) delete game.selections[game.hunterPending!.actorId];
+          game.phaseId++;
+          if (!alive(game).length) resolveShot(game, now, random, true);
+        } else if (!finishIfWon(game, now)) {
           if (['vote', 'runoff', 'night'].includes(game.phase)) {
             const phase = game.phase === 'night' ? 'night' : 'vote';
             game.voteResult = null;
@@ -314,9 +363,10 @@ export function viewFor(game: Game, viewerId: string) {
   const viewer = game.players.find(p => p.id === viewerId);
   check(viewer, '参加者ではありません');
   const isFinished = game.phase === 'finished';
-  const canSeePrivate = viewer.alive && !isFinished;
+  const canSeePrivate = (viewer.alive || game.phase === 'hunter' && game.hunterPending?.actorId === viewerId) && !isFinished;
   const publicInfo = {
     resultConfirmation: false,
+    hunter: game.hunterPending ? { actorId: game.hunterPending.actorId, day: game.hunterPending.day } : null,
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,

@@ -13,7 +13,7 @@ function compositionFor(role: Role, count: number): Composition {
   const composition = { ...DEFAULT_COMPOSITIONS[count]! };
   if (role === 'lover' && composition.lover === 0) {
     composition.villager -= 2; composition.lover = 2;
-  } else if (composition[role] === 0) {
+  } else if ((composition[role] ?? 0) === 0) {
     composition.villager -= 1; composition[role] = 1;
   }
   return composition;
@@ -30,7 +30,7 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -74,7 +74,7 @@ export function applySoloAction(session: SoloSession, action: string, payload: R
     return run(session, actorId, { type: 'select', targetId: String(payload.targetId), ...(wolfAtNight ? { strength: Number(payload.strength ?? 2) as 1|2|3 } : {}) });
   }
   if (action === 'remove') return run(session, actorId, { type: 'remove', targetId: String(payload.targetId) });
-  if (['confirm', 'startVote', 'extend', 'next'].includes(action)) return run(session, actorId, { type: action } as Command['action']);
+  if (['confirm', 'startVote', 'extend', 'next', 'cancelShot'].includes(action)) return run(session, actorId, { type: action } as Command['action']);
   throw new Error('この操作は試遊モードでは使えません。');
 }
 
@@ -97,6 +97,12 @@ export function completeSoloPhase(session: SoloSession, includeViewer: boolean, 
   let next = session;
   if (next.game.phase === 'discussion') return includeViewer ? applySoloAction(next, 'startVote') : next;
   if (['execution', 'morning'].includes(next.game.phase)) return includeViewer ? applySoloAction(next, 'next') : next;
+  if (next.game.phase === 'hunter') {
+    const actorId=next.game.hunterPending!.actorId;
+    if (!includeViewer && actorId===SOLO_VIEWER) return next;
+    if (!next.game.selections[actorId]) next=applySoloAction(next,'select',{targetId:targetFor(next.game,actorId,preferredTargetId)},actorId);
+    return applySoloAction(next,'confirm',{},actorId);
+  }
   const actors = next.game.players.filter(player => player.alive && (includeViewer || player.id !== SOLO_VIEWER)).map(player => player.id);
   for (const actorId of actors) {
     if (next.game.phaseId !== startingPhase || next.game.phase === 'finished') break;
@@ -142,8 +148,45 @@ export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession 
   return session;
 }
 
-export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf' | 'seer-wolfbound' | 'medium-wolfbound' | 'thief-wolfbound';
+export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf' | 'seer-wolfbound' | 'medium-wolfbound' | 'thief-wolfbound' | 'hunter-execution' | 'hunter-attack' | 'hunter-lover' | 'hunter-wolf' | 'thief-hunter';
 export function createCheckScenario(kind: CheckScenario): SoloSession {
+  if (kind === 'thief-hunter') {
+    let session=createSoloSession('thief',10);
+    const target=session.game.players.find(p=>p.role==='villager'&&p.id!==SOLO_VIEWER)!;
+    target.role=target.initialRole=target.apparentRole='hunter';
+    session.room.composition!.villager--;session.room.composition!.hunter=1;
+    session=applySoloAction(session,'select',{targetId:target.id});
+    for(const p of session.game.players)session=applySoloAction(session,'confirm',{},p.id);
+    return session;
+  }
+  if (['hunter-execution','hunter-attack','hunter-lover','hunter-wolf'].includes(kind)) {
+    let session=createSoloSession('hunter',10);
+    if(kind==='hunter-lover') {
+      const villagers=session.game.players.filter(p=>p.role==='villager').slice(0,2);
+      for(const p of villagers)p.role=p.initialRole=p.apparentRole='lover';
+      session.room.composition!.villager-=2;session.room.composition!.lover=2;
+    }
+    if(kind==='hunter-attack') {
+      session=prepareNight(session);
+      for(const p of session.game.players.filter(p=>p.alive)) {
+        if(['wolf','seer','knight'].includes(p.role))session=applySoloAction(session,'select',{targetId:p.role==='knight'?session.game.players.find(x=>x.role==='villager')!.id:SOLO_VIEWER,strength:2},p.id);
+        session=applySoloAction(session,'confirm',{},p.id);
+      }
+    } else {
+      session=prepareVote(session);
+      const wolf=session.game.players.find(p=>p.role==='wolf')!;
+      for(const p of session.game.players.filter(p=>p.alive)) {
+        session=applySoloAction(session,'select',{targetId:p.id===SOLO_VIEWER?wolf.id:SOLO_VIEWER},p.id);
+        session=applySoloAction(session,'confirm',{},p.id);
+      }
+    }
+    if(kind==='hunter-lover'||kind==='hunter-wolf') {
+      if(kind==='hunter-wolf')session.game.players.filter(p=>p.role==='wolf').slice(1).forEach(p=>{p.alive=false;});
+      const target=session.game.players.find(p=>p.alive&&p.role===(kind==='hunter-lover'?'lover':'wolf'))!;
+      session=applySoloAction(session,'select',{targetId:target.id});session=applySoloAction(session,'confirm');
+    }
+    return session;
+  }
   if (kind === 'thief-wolfbound') {
     let session = createSoloSession('thief', 10);
     const target = session.game.players.find(player => player.role === 'villager' && player.id !== SOLO_VIEWER)!;

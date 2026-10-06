@@ -2,7 +2,7 @@ import type { Phase } from '../domain/game.ts';
 
 type TaskState = {
   phase: Phase; alive: boolean; confirmed: boolean; selected: boolean; roleSeen: boolean;
-  resultConfirmation?: boolean;
+  resultConfirmation?: boolean; hunterActor?: boolean;
   busy: boolean; retryPending: boolean; offline: boolean;
 };
 // This public-facing guidance deliberately accepts no role or night target information.
@@ -14,6 +14,7 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
   if (s.phase === 'finished') return task('試合の結果を確認しましょう', '勝利陣営と、みんなの役職を振り返れます。');
   if (s.phase === 'execution' && s.resultConfirmation === false) return task('処刑の結果を確認しましょう', '主催者が「次へ進む」を押すと、夜に進みます。');
   if (s.phase === 'morning' && s.resultConfirmation === false) return task('朝の結果を確認しましょう', '主催者が「次へ進む」を押すと、議論が始まります。');
+  if (s.phase === 'hunter') return s.hunterActor ? task('最後に撃つ相手を選んでください', '生存者1人を選び、発砲を確定してください。') : task('狩人の発砲を待っています', '発砲と後追いを処理した後に、勝敗を判定します。', true);
   if (!s.alive) return task('静かに見守りましょう', 'あなたは脱落しています。確認や投票は不要です。', true);
   if (s.confirmed) return task('あなたの操作は完了しました', 'ほかの生存者が完了すると、自動で次へ進みます。', true);
   switch (s.phase) {

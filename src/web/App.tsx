@@ -21,7 +21,7 @@ const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
 const names = ['あなた', 'あおい', 'はる', 'みなと', 'ひなた'];
 const demoRoom = (): Room => ({ id: 'preview', code: 'A7C92F4B10', hostId: 'p0', viewerId: 'p0', status: 'waiting', revision: 1,
-  loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
+  loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
   members: names.map((nickname, i) => ({ id: `p${i}`, nickname, connected: true })) });
 function readSaved(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key: string, value: string | null) { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* The auth layer reports storage failures. */ } }
@@ -155,7 +155,7 @@ export default function App() {
       if (preview) setRoom({ ...room, composition: composition ?? { ...DEFAULT_COMPOSITIONS[room.members.length]! }, customComposition: composition !== null, discussionMinutes, victoryPoints, consecutiveGuard, wolfboundEnabled, revision: room.revision + 1 });
       else {
         // Older servers accept six roles; hide the new role until migration 011 is available.
-        const supported = ([role]: [string, unknown]) => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole);
+        const supported = ([role]: [string, unknown]) => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole);
         const compPayload = composition ? Object.fromEntries(Object.entries(composition).filter(supported)) : composition;
         const pointsPayload = victoryPoints ? Object.fromEntries(Object.entries(victoryPoints).filter(supported)) : victoryPoints;
         const updated = await lobby('settings', { roomId: room.id, revision: room.revision, composition: compPayload, discussionMinutes, ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
@@ -255,7 +255,7 @@ export default function App() {
         <section className="promise"><Moon small/><p>ひみつはスマホに。会話は、この場で。</p><span>インストールも、専任の司会者もいりません。</span></section>
       </>}
     </main>
-    {rulesOpen && <RulesHelp settings={room ? { composition: room.composition, discussionMinutes: room.discussionMinutes, victoryPoints: room.victoryPoints, loverRole: room.loverRole, thiefRole: room.thiefRole, consecutiveGuard: room.consecutiveGuard, wolfboundEnabled: room.wolfboundEnabled } : undefined} onClose={() => setRulesOpen(false)}/>}
+    {rulesOpen && <RulesHelp settings={room ? { composition: room.composition, discussionMinutes: room.discussionMinutes, victoryPoints: room.victoryPoints, loverRole: room.loverRole, thiefRole: room.thiefRole, hunterRole: room.hunterRole, consecutiveGuard: room.consecutiveGuard, wolfboundEnabled: room.wolfboundEnabled } : undefined} onClose={() => setRulesOpen(false)}/>}
     <footer><span>夜のよりあい</span><span>友だちと囲む、小さな推理の時間。</span><small>開発中 · {room ? room.status === 'waiting' ? '待機室' : 'ゲーム' : 'はじめの一歩'}</small></footer>
   </div>;
 }
@@ -272,8 +272,8 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [consecutiveGuard, setConsecutiveGuard] = useState(room.consecutiveGuard ?? true);
   const [wolfboundEnabled, setWolfboundEnabled] = useState(room.wolfboundEnabled ?? false);
   const [custom, setCustom] = useState(room.customComposition);
-  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
-  const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole));
+  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
+  const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole));
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
   const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
@@ -283,9 +283,9 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   let pointsError = '';
   try { if (room.victoryPoints) validateVictoryPoints(pointsDraft); } catch (e) { pointsError = (e as Error).message; }
   let currentError = '';
-  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0 }); } catch (e) { currentError = (e as Error).message; }
+  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 }); } catch (e) { currentError = (e as Error).message; }
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
-  useEffect(() => { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
+  useEffect(() => { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
   async function copy() {
     try { await navigator.clipboard.writeText(invite); onNotice(preview ? 'プレビュー用のリンクをコピーしました。' : '招待リンクをコピーしました。'); }
     catch { onNotice('リンクを長押ししてコピーしてください。'); }
@@ -301,7 +301,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
         {room.consecutiveGuard !== undefined && <div className="setting-line"><span>騎士の連続護衛</span><strong>{room.consecutiveGuard ? 'あり' : 'なし'}</strong></div>}
         {room.wolfboundEnabled !== undefined && <div className="setting-line"><span>狼憑き</span><strong>{room.wolfboundEnabled ? '50%で0〜1人' : '使用しない'}</strong></div>}
-        <div className="role-grid">{availableRoles.map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦', '♡', '🥖', '♢'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
+        <div className="role-grid">{availableRoles.map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦', '♡', '🥖', '♢', '⌖'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
         {room.loverRole && (room.composition?.lover ?? 0) > 0 && <p className="inline-note">恋人は村側の2人組です。片方が脱落すると、もう片方も後追いで脱落します。</p>}
         {!room.composition && <p className="small-note">5人集まると、おすすめの配役が表示されます。</p>}
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}

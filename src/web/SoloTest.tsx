@@ -5,8 +5,8 @@ import { roleNames } from './types.ts';
 import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
-const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief'];
-const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', finished: '試合終了' } as const;
+const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter'];
+const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', hunter:'狩人の発砲', finished: '試合終了' } as const;
 
 export default function SoloTest({ onExit }: { onExit: () => void }) {
   const [role, setRole] = useState<Role>('villager');
@@ -41,13 +41,18 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
       <button className="secondary-button" onClick={() => update(createCheckScenario('seer-wolfbound'))}>狼憑きを占う → 人狼判定</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('medium-wolfbound'))}>狼憑きを処刑 → 霊媒は村人判定</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('thief-wolfbound'))}>怪盗が狼憑きを奪う → 村人表示</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('hunter-execution'))}>狩人を処刑 → 最後の発砲</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('hunter-attack'))}>狩人を襲撃 → 最後の発砲</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('hunter-lover'))}>狩人が恋人を撃つ → 後追い</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('hunter-wolf'))}>狩人が最後の人狼を撃つ → 村側勝利</button>
+      <button className="secondary-button" onClick={() => update(createCheckScenario('thief-hunter'))}>怪盗が狩人を奪う → 初夜</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('baker-alive'))}>パン屋が生存 → パンが届く朝</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('baker-dead'))}>パン屋が襲撃 → パンが届かない朝</button>
     </div>
   </section>;
 
   const game = session.game;
-  const incompleteBots = game.players.filter(player => player.alive && player.id !== response.room.viewerId && !game.confirmed.includes(player.id)).length;
+  const incompleteBots = game.phase==='hunter' ? Number(game.hunterPending?.actorId!==response.room.viewerId) : game.players.filter(player => player.alive && player.id !== response.room.viewerId && !game.confirmed.includes(player.id)).length;
   return <><aside className="solo-toolbar" aria-label="ひとり試遊の操作">
     <div><strong>ひとり試遊中</strong><span>{game.day}日目・{phaseNames[game.phase]}</span></div>
     {game.phase !== 'finished' && <div className="solo-toolbar-actions">

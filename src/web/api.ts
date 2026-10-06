@@ -54,7 +54,7 @@ export class RoomAccessLostError extends Error {}
 function normalizeRoom(room: Room): Room {
   const bakerRole = room.victoryPoints?.baker !== undefined;
   const thiefRole = room.victoryPoints?.thief !== undefined;
-  return { ...room, bakerRole, thiefRole, composition: room.composition ? { ...room.composition, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0 } : room.composition };
+  return { ...room, bakerRole, thiefRole, hunterRole: room.victoryPoints?.hunter !== undefined, composition: room.composition ? { ...room.composition, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 } : room.composition };
 }
 export async function membership(action: 'remove' | 'leave', payload: Record<string, unknown>): Promise<{ room?: Room; left?: boolean }> {
   if (!client) throw new Error('接続先が設定されていません。');
@@ -68,7 +68,8 @@ export async function membership(action: 'remove' | 'leave', payload: Record<str
 }
 export async function lobby(action: string, payload: Record<string, unknown>): Promise<Room> {
   if (!client) throw new Error('接続先が設定されていません。');
-  let { data, error } = await client.rpc('lobby_command_wolfbound', { action, payload });
+  let { data, error } = await client.rpc('lobby_command_hunter', { action, payload });
+  if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_wolfbound', { action, payload }));
   if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_guard', { action, payload }));
   if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_thief', { action, payload }));
   if (missingAccessFunction(error?.code)) ({ data, error } = await client.rpc('lobby_command_baker', { action, payload }));

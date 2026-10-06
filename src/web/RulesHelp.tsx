@@ -7,8 +7,9 @@ import { roleNames } from './types.ts';
 import { ScoringRules } from './Points.tsx';
 
 // Accept public settings only. Player identities, role assignments and actions never enter this component.
-export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
+export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; hunterRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
 const roles: { role: Role; team: string; action: string; notes: string }[] = [
+  { role: 'hunter', team: '村側', action: '処刑・襲撃で死亡すると、生存者1人を選んで最後の発砲を行います。', notes: '発動時に狩人と公開されます。護衛では防げず、恋人を撃つと相方も後追いします。発砲後に勝敗を判定します。途中退場では発動しません。' },
   { role: 'villager', team: '村側', action: '会話と投票で、人狼を見つけましょう。', notes: '特別な能力はありません。夜も「あなただけの情報」を開き、確認を完了します。' },
   { role: 'wolf', team: '人狼側', action: '夜に自分以外の生存者1人と希望度1〜3を選びます。', notes: '仲間も対象にできます。対象別の希望度合計が最大の人を襲撃し、同点なら無作為に決まります。仲間への襲撃も成立します。他の人狼の選択や集計は表示されません。' },
   { role: 'seer', team: '村側', action: '夜に自分以外の生存者1人を選び、人狼かどうか調べます。', notes: '対象を選んで確定します。同じ人を再び占えます。初夜の白通知はありません。結果は本人だけが確認できます。' },
@@ -39,7 +40,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
     <div className="rules-help-body" ref={content}>
       {settings && <p className="rules-running-note">説明を開いている間も、ゲームと残り時間は進みます。</p>}
       {section === 'roles' && <section aria-labelledby="rules-roles-title"><h3 id="rules-roles-title">役職一覧</h3><p>村側は人狼を全員見つけ、人狼側は人間を減らすことを目指します。脱落しても、所属する陣営が勝てば勝利です。</p>
-        <div className="rules-role-list">{roles.filter(item => item.role !== 'lover' || !settings || settings.loverRole).map(item => <article className="rules-role-card" key={item.role}>
+        <div className="rules-role-list">{roles.filter(item => (item.role !== 'lover' || !settings || settings.loverRole) && (item.role !== 'hunter' || !settings || settings.hunterRole)).map(item => <article className="rules-role-card" key={item.role}>
           <RoleImage role={item.role} compact /><div className="rules-role-heading"><h4>{roleNames[item.role]}</h4><span className={item.team === '人狼側' ? 'rules-team wolves' : 'rules-team'}>{item.team}</span>{settings?.composition && <span className="rules-role-count">今回 {settings.composition[item.role] ?? 0}人</span>}</div>
           <p>{item.action}</p><p className="rules-role-notes">{item.notes}</p>
         </article>)}{(!settings||settings.wolfboundEnabled!==undefined)&&<article className="rules-role-card"><RoleImage role="villager" compact/><div className="rules-role-heading"><h4>狼憑き</h4><span className="rules-team">村側</span>{settings&&<span className="rules-role-count">{settings.wolfboundEnabled?'50%で0〜1人':'今回は不使用'}</span>}</div><p>村人の中に紛れる、能力のない村側です。</p><p className="rules-role-notes">本人にも村人と表示されます。占いでは「人狼」、霊媒では「人狼ではない」と判定され、試合終了後にだけ正体が公開されます。</p></article>}</div><p className="small-note">本人の役職や仲間の名前は、ゲーム画面の「あなただけの情報」で確認してください。</p>

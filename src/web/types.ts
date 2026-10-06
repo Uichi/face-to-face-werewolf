@@ -8,10 +8,11 @@ export type Room = {
   bakerRole?: boolean;
   breadChoices?: boolean;
   thiefRole?: boolean;
+  hunterRole?: boolean;
   firstDayNoExecution?: boolean;
   consecutiveGuard?: boolean;
   wolfboundEnabled?: boolean;
   victoryPoints?: VictoryPoints;
   customComposition: boolean; members: Member[];
 };
-export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人', lover: '恋人', baker: 'パン屋', thief: '怪盗' } as const;
+export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人', lover: '恋人', baker: 'パン屋', thief: '怪盗', hunter: '狩人' } as const;
