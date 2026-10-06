@@ -97,3 +97,6 @@
 .preset-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .preset-buttons button { padding: 10px 14px; border: 1px solid #718276; border-radius: 8px; background: #f5f6ef; color: #182d26; cursor: pointer; }
 .preset-buttons button:disabled { opacity: .5; cursor: default; }
+
+.wolfbound-reveal { margin: 24px 0; text-align: center; }
+.wolfbound-reveal .role-art { width: 160px; max-width: 100%; height: auto; border-radius: 12px; }

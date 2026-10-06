@@ -1,3 +1,4 @@
+import RoleImage from './RoleImage.tsx';
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { GameView } from './game-api.ts';
@@ -50,6 +51,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
     <PublicLog events={game.publicLog??[]} room={room}/>
     <div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
     <div className="result-roles"><h3>全員の役職</h3>{game.players.map(p => {const changed=p.initialRole!==p.role||p.initialWolfbound!==p.wolfbound;return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? changed ? `${roleLabel(p,true)} → ${roleLabel(p)}` : roleLabel(p) : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>})}</div>
+    {game.phase === 'finished' && game.players.some(player => player.wolfbound || player.initialWolfbound) && <section className="wolfbound-reveal"><h3>狼憑きの正体</h3><RoleImage role="wolfbound" compact/><p>{game.players.filter(player => player.wolfbound).map(player => `${name(player.id)}さん`).join('、')}が狼憑きでした。</p>{game.players.filter(player => player.initialWolfbound && !player.wolfbound).map(player => <p key={player.id}>{name(player.id)}さんの狼憑き状態は、怪盗へ移りました。</p>)}</section>}
     {game.scores && <Scoreboard room={room} scores={game.scores}/>}
     {children}
   </section>;
