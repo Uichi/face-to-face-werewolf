@@ -70,3 +70,5 @@ GitHubの接続先は https://github.com/Uichi/face-to-face-werewolf です。�
 狩人を追加しました。[狩人の導入手順](docs/hunter-setup.md)に沿って022のSQLを追加すると、カスタム配役で0〜1人を設定できます。
 
 待機室に[配役プリセットとお気に入り設定](docs/preset-settings.md)を追加しました。追加SQLは不要です。
+
+[ランダム配役モード](docs/random-composition-setup.md)を追加しました。023のSQL適用後、待機室で抽選候補を選び、人数を終了まで秘密にして遊べます。

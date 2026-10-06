@@ -7,7 +7,7 @@ import { roleNames } from './types.ts';
 import { ScoringRules } from './Points.tsx';
 
 // Accept public settings only. Player identities, role assignments and actions never enter this component.
-export type HelpSettings = { composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; hunterRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
+export type HelpSettings = { compositionMode?: string; randomCandidates?: Role[]; fixedWolves?: number; composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; hunterRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
 const roles: { role: Role; team: string; action: string; notes: string }[] = [
   { role: 'hunter', team: '村側', action: '処刑・襲撃で死亡すると、生存者1人を選んで最後の発砲を行います。', notes: '発動時に狩人と公開されます。護衛では防げず、恋人を撃つと相方も後追いします。発砲後に勝敗を判定します。途中退場では発動しません。' },
   { role: 'villager', team: '村側', action: '会話と投票で、人狼を見つけましょう。', notes: '特別な能力はありません。夜も「あなただけの情報」を開き、確認を完了します。' },
@@ -40,6 +40,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
     <div className="rules-help-body" ref={content}>
       {settings && <p className="rules-running-note">説明を開いている間も、ゲームと残り時間は進みます。</p>}
       {section === 'roles' && <section aria-labelledby="rules-roles-title"><h3 id="rules-roles-title">役職一覧</h3><p>村側は人狼を全員見つけ、人狼側は人間を減らすことを目指します。脱落しても、所属する陣営が勝てば勝利です。</p>
+        {settings?.compositionMode==='random'&&<p className="inline-note">ランダム配役：人狼{settings.fixedWolves}人固定。候補は{settings.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。実際の配役人数は試合終了まで秘密です。</p>}
         <div className="rules-role-list">{roles.filter(item => (item.role !== 'lover' || !settings || settings.loverRole) && (item.role !== 'hunter' || !settings || settings.hunterRole)).map(item => <article className="rules-role-card" key={item.role}>
           <RoleImage role={item.role} compact /><div className="rules-role-heading"><h4>{roleNames[item.role]}</h4><span className={item.team === '人狼側' ? 'rules-team wolves' : 'rules-team'}>{item.team}</span>{settings?.composition && <span className="rules-role-count">今回 {settings.composition[item.role] ?? 0}人</span>}</div>
           <p>{item.action}</p><p className="rules-role-notes">{item.notes}</p>

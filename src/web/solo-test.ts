@@ -1,3 +1,4 @@
+import { randomComposition, RANDOM_ROLES } from '../domain/random-composition.ts';
 import { applyCommand, BREAD_TYPES, createGame, viewFor } from '../domain/game.ts';
 import type { Command, Game, Phase } from '../domain/game.ts';
 import { DEFAULT_COMPOSITIONS, NO_EXECUTION_ID } from '../domain/rules.ts';
@@ -34,6 +35,15 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
+}
+
+export function createRandomSoloSession(count=10):SoloSession {
+  const random = (max:number)=> { const range=4294967296-(4294967296%max);let value:number;do {value=crypto.getRandomValues(new Uint32Array(1))[0]!;}while(value>=range);return value%max; };
+  const composition=randomComposition(count,RANDOM_ROLES,random);
+  const session=createSoloSession('villager',count);
+  session.game=createGame({id:session.game.id,hostId:SOLO_VIEWER,playerIds:session.game.players.map(p=>p.id),composition,discussionMinutes:1,randomCandidates:RANDOM_ROLES},session.now,random);
+  session.room={...session.room,composition:null,compositionMode:'random',randomComposition:true,randomCandidates:[...RANDOM_ROLES],fixedWolves:composition.wolf,customComposition:false};
+  return session;
 }
 
 export function createRobbedScenario(role: Exclude<Role, 'thief'>, count = 10): SoloSession {

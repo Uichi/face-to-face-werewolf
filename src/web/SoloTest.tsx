@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { Role } from '../domain/rules.ts';
 import GameScreen from './GameScreen.tsx';
 import { roleNames } from './types.ts';
-import { applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
+import { createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
 const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter'];
@@ -26,6 +26,7 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
     <label>試遊する人数<select value={playerCount} onChange={event => setPlayerCount(Number(event.target.value))}>{Array.from({length:9},(_,index)=>index+5).map(value=><option value={value} key={value}>{value}人（自動操作{value-1}人）</option>)}</select></label>
     <label>確認したい自分の役職<select value={role} onChange={event => setRole(event.target.value as Role)}>{roles.map(value => <option value={value} key={value}>{roleNames[value]}</option>)}</select></label>
     <button className="primary" onClick={() => update(createSoloSession(role, playerCount))}>{playerCount}人で最初から試遊を始める</button>
+    <button className="secondary-button" onClick={()=>update(createRandomSoloSession(playerCount))}>ランダム配役で試遊する（自分の役職も抽選）</button>
     <div className="solo-scenarios"><h2>確認したい場面から始める</h2><p>通常と同じ判定処理を通して、選んだ場面をすぐ表示します。</p>
       {role !== 'thief' && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}
       <button className="secondary-button" onClick={() => update(createEndingScenario('village'))}>人狼を処刑 → 村側勝利</button>

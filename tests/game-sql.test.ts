@@ -95,7 +95,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
   await t.test('狂人に仲間情報・夜の能力を渡さず、白判定・襲撃・共通確認を処理する',async()=>{
    const f=await setup(8),base=await f.state();
    const madman=base.players.find(p=>p.role==='madman')!,seer=base.players.find(p=>p.role==='seer')!;
-   const view=(await f.call(madman.id,'get')).game!;assert.equal(view.private!.role,'madman');assert.equal(view.wolves,null);assert.equal(view.public.composition.madman,1);
+   const view=(await f.call(madman.id,'get')).game!;assert.equal(view.private!.role,'madman');assert.equal(view.wolves,null);assert.equal(view.public.composition!.madman,1);
    for(const wolf of base.players.filter(p=>p.role==='wolf'))assert.equal((await f.call(wolf.id,'get')).game!.wolves!.memberIds.includes(madman.id),false);
    await f.allConfirm();await f.allConfirm();let g=await f.state();
    g={...g,phase:'night',phaseId:g.phaseId+1,deadline:Date.now()+60000,confirmed:[],selections:{}};
@@ -121,7 +121,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    const invalid=await raw('lobby_command','settings',{roomId:f.roomId,revision:response.room.revision,discussionMinutes:3,composition:{villager:1,wolf:1,seer:1,medium:0,knight:0,madman:2}});assert.equal(invalid.ok,false);
    await db.exec('reset role');await db.query('update app_private.rooms set composition=$1::jsonb where id=$2',[JSON.stringify(legacy),f.roomId]);
    await user(f.users[0]!);const started=await raw('game_command','start',{roomId:f.roomId,revision:response.room.revision,requestId:randomUUID()});
-   assert.equal(started.game!.public.composition.madman,0);
+   assert.equal(started.game!.public.composition!.madman,0);
   });
   await t.test('処刑・朝は生存者全員確認のみで進み、死んだ主催者・未確認者・再送を正しく扱う',async()=>{
    for(const phase of ['execution','morning'] as const){
@@ -376,7 +376,7 @@ test('Supabaseゲーム処理: 試合完走・再戦・秘密情報・権限・�
    wait=await raw('lobby_command_baker','settings',{roomId:f.roomId,revision:wait.room.revision,discussionMinutes:3,composition,victoryPoints:wait.room.victoryPoints});
    assert.equal(wait.room.bakerRole,true);assert.equal(wait.room.composition!.baker,1);assert.equal(wait.room.victoryPoints!.baker,5);
    const started=await raw('game_command_baker','start',{roomId:f.roomId,revision:wait.room.revision,requestId:randomUUID()});
-   g=await f.state();assert.equal(g.players.filter(p=>p.role==='baker').length,1);assert.equal(started.game!.public.composition.baker,1);
+   g=await f.state();assert.equal(g.players.filter(p=>p.role==='baker').length,1);assert.equal(started.game!.public.composition!.baker,1);
    g.phase='morning';g.phaseId+=1;g.confirmed=[];await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);await user(f.users[0]!);
    let morning=await raw('game_command_baker','get',{roomId:f.roomId});assert.equal(morning.game!.public.breadDelivered,true);
    g.players.find(p=>p.role==='baker')!.alive=false;await db.exec('reset role');await db.query('update app_private.games set state=$1 where room_id=$2',[JSON.stringify(g),f.roomId]);await user(f.users[0]!);

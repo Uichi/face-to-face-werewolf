@@ -40,6 +40,7 @@ export type Game = {
   breadDelivery?: { day: number; breadType: BreadType } | null;
   consecutiveGuard: boolean;
   lastGuardTargets: Record<string, string>;
+  randomCandidates?: import('./rules.ts').Role[];
   hunterPending?: { actorId: string; resume: 'execution' | 'morning'; day: number; breadChoice?: string; bakerId?: string };
   secrets: Secret[]; removals: { playerId: string; day: number }[];
   receipts: Record<string, string>;
@@ -113,7 +114,7 @@ function resolveShot(game: Game, now: number, random: RandomIndex, cancelled = f
 }
 
 export function createGame(input: {
-  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints; consecutiveGuard?: boolean; wolfboundEnabled?: boolean;
+  id: string; hostId: string; playerIds: string[]; composition: Composition; discussionMinutes?: number; victoryPoints?: VictoryPoints; consecutiveGuard?: boolean; wolfboundEnabled?: boolean; randomCandidates?: import('./rules.ts').Role[];
 }, now: number, random: RandomIndex): Game {
   const minutes = input.discussionMinutes ?? 3;
   check(input.id.length > 0 && input.playerIds.includes(input.hostId), '試合・主催者が不正です');
@@ -131,6 +132,7 @@ export function createGame(input: {
     }
   }
   return {
+    randomCandidates: input.randomCandidates ? [...input.randomCandidates] : undefined,
     id: input.id, hostId: input.hostId, players, phase: 'roles', phaseId: 1,
     day: 1, discussionMs: minutes * 60_000, deadline: null, lastTime: now,
     selections: {}, attackStrengths: {}, confirmed: [], runoffIds: [], voteResult: null, victimId: null,
@@ -371,7 +373,10 @@ export function viewFor(game: Game, viewerId: string) {
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true } : {}) })),
-    composition: Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
+    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
+    compositionMode: game.randomCandidates ? 'random' as const : undefined,
+    randomCandidates: game.randomCandidates ? [...game.randomCandidates] : undefined,
+    fixedWolves: game.randomCandidates ? game.players.filter(p=>(p.initialRole??p.role)==='wolf').length : undefined,
     breadDelivered: game.phase === 'morning' ? !!game.breadDelivery : game.phase === 'discussion' && game.day === 1 ? game.breadDelivery?.day === 0 : false,
     breadDelivery: structuredClone(game.breadDelivery ?? null),
     completedCount: game.confirmed.filter(id => alive(game).some(p => p.id === id)).length,

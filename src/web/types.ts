@@ -4,6 +4,7 @@ export type Member = { id: string; nickname: string; connected: boolean; points?
 export type Room = {
   id: string; code: string; hostId: string; viewerId: string; status: 'waiting' | 'playing' | 'finished';
   revision: number; discussionMinutes: number; composition: Composition | null;
+  randomComposition?: boolean; compositionMode?: 'standard' | 'custom' | 'random'; randomCandidates?: import('../domain/rules.ts').Role[]; fixedWolves?: number;
   loverRole?: boolean;
   bakerRole?: boolean;
   breadChoices?: boolean;
