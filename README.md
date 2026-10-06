@@ -68,3 +68,5 @@ GitHubの接続先は https://github.com/Uichi/face-to-face-werewolf です。�
 パン屋はカスタム配役で0〜1人を設定できます。生存している朝だけ全員へパンの到着を表示し、本人の名前は公開しません。公開Supabaseへ追加する手順は [パン屋の追加手順](docs/baker-setup.md) を参照してください。
 
 狩人を追加しました。[狩人の導入手順](docs/hunter-setup.md)に沿って022のSQLを追加すると、カスタム配役で0〜1人を設定できます。
+
+待機室に[配役プリセットとお気に入り設定](docs/preset-settings.md)を追加しました。追加SQLは不要です。

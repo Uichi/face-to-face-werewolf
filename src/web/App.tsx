@@ -1,3 +1,5 @@
+import { SETTINGS_KEY, parseFavorite, adaptFavorite, presetComposition } from './saved-settings.ts';
+import type { FavoriteSettings, Preset } from './saved-settings.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import QRCode from 'qrcode';
@@ -266,6 +268,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   onSave: (composition: Composition | null, minutes: number, victoryPoints?: VictoryPoints, consecutiveGuard?: boolean, wolfboundEnabled?: boolean) => Promise<void>; onNotice: (message: string) => void;
 }) {
   const [pointsDraft, setPointsDraft] = useState<VictoryPoints>({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints });
+  const [favorite, setFavorite] = useState<FavoriteSettings | null>(() => { try { return parseFavorite(localStorage.getItem(SETTINGS_KEY)); } catch { return null; } });
   const [qr, setQr] = useState('');
   const [editing, setEditing] = useState(false);
   const [minutes, setMinutes] = useState(room.discussionMinutes);
@@ -279,13 +282,38 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
   const host = room.members.find(m => m.id === room.hostId);
   let settingError = '';
-  try { if (custom) validateComposition(count, draft); if (wolfboundEnabled && (custom ? draft.villager : room.composition?.villager ?? 0) < 1) throw new Error('狼憑きを使用するには村人が1人以上必要です'); } catch (e) { settingError = (e as Error).message; }
+  try { if (custom) validateComposition(count, draft); if (wolfboundEnabled && (custom ? draft.villager : DEFAULT_COMPOSITIONS[count]?.villager ?? 0) < 1) throw new Error('狼憑きを使用するには村人が1人以上必要です'); } catch (e) { settingError = (e as Error).message; }
   let pointsError = '';
   try { if (room.victoryPoints) validateVictoryPoints(pointsDraft); } catch (e) { pointsError = (e as Error).message; }
   let currentError = '';
   try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 }); } catch (e) { currentError = (e as Error).message; }
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
   useEffect(() => { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
+  function choosePreset(preset: Preset) {
+    try { setDraft(presetComposition(count, preset, availableRoles)); setCustom(preset !== 'standard'); setWolfboundEnabled(false); }
+    catch (error) { onNotice((error as Error).message); }
+  }
+  function saveFavorite() {
+    const value: FavoriteSettings = { version: 1, count, composition: custom ? { ...draft } : null, minutes, points: { ...pointsDraft }, consecutiveGuard, wolfboundEnabled };
+    if (!parseFavorite(JSON.stringify(value))) { onNotice('設定を確認してください。5〜13人で保存できます。'); return; }
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(value)); setFavorite(value); onNotice('このブラウザにお気に入り設定を保存しました。部屋への反映は「この設定を部屋に反映」を押してください。'); }
+    catch { onNotice('保存できませんでした。ブラウザの保存設定を確認してください。'); }
+  }
+  function loadFavorite() {
+    if (!favorite) return;
+    try {
+      if (favorite.wolfboundEnabled && room.wolfboundEnabled === undefined) throw new Error('この部屋では保存した狼憑き設定を使えません');
+      const value = adaptFavorite(favorite, count, availableRoles);
+      setCustom(value.composition !== null); setDraft(value.composition ?? { ...DEFAULT_COMPOSITIONS[count]! });
+      setMinutes(value.minutes); setPointsDraft(value.points); setConsecutiveGuard(value.consecutiveGuard); setWolfboundEnabled(value.wolfboundEnabled);
+      onNotice('お気に入り設定を呼び出しました。内容を確認して部屋に反映してください。');
+    } catch (error) { onNotice((error as Error).message); }
+  }
+  function deleteFavorite() {
+    if (!window.confirm('このブラウザに保存したお気に入り設定を削除しますか？')) return;
+    try { localStorage.removeItem(SETTINGS_KEY); setFavorite(null); onNotice('お気に入り設定を削除しました。'); }
+    catch { onNotice('設定を削除できませんでした。'); }
+  }
   async function copy() {
     try { await navigator.clipboard.writeText(invite); onNotice(preview ? 'プレビュー用のリンクをコピーしました。' : '招待リンクをコピーしました。'); }
     catch { onNotice('リンクを長押ししてコピーしてください。'); }
@@ -307,6 +335,8 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}
         {currentError && <p role="alert" className="field-error">参加人数が変わりました。配役を設定し直してください。</p>}
         {editing && isHost && <form className="settings-form" onSubmit={e => { e.preventDefault(); void onSave(custom ? draft : null, minutes, room.victoryPoints ? pointsDraft : undefined, consecutiveGuard, wolfboundEnabled); }}>
+          <fieldset className="preset-settings"><legend>配役プリセット</legend><p className="small-note">現在の人数に合わせます。時間・配点はそのままです。狼憑きは使用しない設定になります。</p><div className="preset-buttons"><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('standard')}>標準</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('basic')}>基本役職のみ</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('special')}>特殊役職あり</button></div><p className="small-note">基本役職のみ：狂人を村人に変更。特殊役職あり：村人を1人以上残し、パン屋・狩人・怪盗を順に追加します。試遊用の配役です。</p></fieldset>
+          <fieldset className="preset-settings"><legend>お気に入り設定</legend><p className="small-note">同じ端末・ブラウザに1件保存できます。配役・議論時間・勝利点・連続護衛・狼憑きを保存します。人数が違う場合は村人数を調整します。</p><div className="preset-buttons"><button type="button" disabled={busy || !!settingError || !!pointsError || count < 5} onClick={saveFavorite}>今の設定を保存</button><button type="button" disabled={busy || !favorite || count < 5} onClick={loadFavorite}>保存した設定を呼び出す</button>{favorite && <button type="button" disabled={busy} onClick={deleteFavorite}>保存を削除</button>}</div>{favorite && <p className="small-note">保存済み：{favorite.count}人・議論{favorite.minutes}分。保存情報を消すと失われます。</p>}</fieldset>
           <label>議論時間<select value={minutes} onChange={e => setMinutes(Number(e.target.value))}>{Array.from({ length: 10 }, (_, i) => <option value={i + 1} key={i}>{i + 1}分</option>)}</select></label>
           {room.consecutiveGuard !== undefined && <label className="check-label"><input type="checkbox" checked={consecutiveGuard} onChange={e => setConsecutiveGuard(e.target.checked)}/>騎士が同じ人を連続して護衛できる</label>}
           {room.wolfboundEnabled !== undefined && <label className="check-label"><input type="checkbox" checked={wolfboundEnabled} onChange={e => setWolfboundEnabled(e.target.checked)}/>狼憑きを使用する（50%で村人の中から0〜1人）</label>}
@@ -315,7 +345,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
           {room.victoryPoints && <fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset>}
           {pointsError && <p className="field-error" role="alert">{pointsError}</p>}
           {settingError && <p className="field-error" role="alert">{settingError}</p>}
-          <button className="primary" disabled={busy || Boolean(settingError) || Boolean(pointsError)}>設定を保存</button>
+          <button className="primary" disabled={busy || Boolean(settingError) || Boolean(pointsError)}>この設定を部屋に反映</button>
         </form>}
         <div className="rule-footnote">初夜の襲撃なし <span>·</span> 役職は本人だけに表示</div>
       </section>

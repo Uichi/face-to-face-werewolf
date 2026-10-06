@@ -92,3 +92,8 @@
 .public-log ol{list-style:none;margin:0;padding:0;display:grid}.public-log li{position:relative;padding:14px 4px 14px 22px;border-top:1px solid var(--line)}.public-log li:first-child{border-top:0}.public-log li:before{content:"";position:absolute;left:4px;top:20px;width:8px;height:8px;border-radius:50%;background:#9a7731}.public-log-day{font-size:11px;font-weight:700;color:#806932;margin-bottom:4px}.public-log p{margin:0;font-size:14px;line-height:1.6}.public-log-follow{margin-top:7px!important;padding:8px 10px;border-left:3px solid #bd7381;background:#fbf0f2;color:#704650}
 @media(max-width:700px){.solo-toolbar{align-items:stretch}.solo-toolbar-actions{width:100%;display:grid;grid-template-columns:1fr}.solo-toolbar>.text-button{margin-right:12px}.solo-scenarios .secondary-button{width:100%}}
 .strength-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 16px}.strength-picker button{border:1px solid var(--line);border-radius:6px;padding:12px 5px;background:#fffef9;color:var(--ink);font-weight:700}.strength-picker button.selected{background:#294438;color:#fff;border-color:#294438}
+
+.preset-settings { border: 1px solid #c7cec6; border-radius: 12px; padding: 16px; min-width: 0; }
+.preset-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.preset-buttons button { padding: 10px 14px; border: 1px solid #718276; border-radius: 8px; background: #f5f6ef; color: #182d26; cursor: pointer; }
+.preset-buttons button:disabled { opacity: .5; cursor: default; }
