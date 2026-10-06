@@ -7,11 +7,12 @@ import { roleNames } from './types.ts';
 import { ScoringRules } from './Points.tsx';
 
 // Accept public settings only. Player identities, role assignments and actions never enter this component.
-export type HelpSettings = { compositionMode?: string; randomCandidates?: Role[]; fixedWolves?: number; composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; hunterRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
+export type HelpSettings = { compositionMode?: string; randomCandidates?: Role[]; fixedWolves?: number; composition?: Composition | null; discussionMinutes?: number; victoryPoints?: VictoryPoints; loverRole?: boolean; thiefRole?: boolean; hunterRole?: boolean; doctorRole?: boolean; consecutiveGuard?: boolean; wolfboundEnabled?: boolean };
 const roles: { role: Role; team: string; action: string; notes: string }[] = [
-  { role: 'hunter', team: '村側', action: '処刑・襲撃で死亡すると、生存者1人を選んで最後の発砲を行います。', notes: '発動時に狩人と公開されます。護衛では防げず、恋人を撃つと相方も後追いします。発砲後に勝敗を判定します。途中退場では発動しません。' },
+  { role: 'hunter', team: '村側', action: '処刑・襲撃・2回目の注射で死亡すると、生存者1人を選んで最後の発砲を行います。', notes: '発動時に狩人と公開されます。護衛では防げず、恋人を撃つと相方も後追いします。発砲後に勝敗を判定します。途中退場では発動しません。' },
   { role: 'villager', team: '村側', action: '会話と投票で、人狼を見つけましょう。', notes: '特別な能力はありません。夜も「あなただけの情報」を開き、確認を完了します。' },
   { role: 'wolf', team: '人狼側', action: '夜に自分以外の生存者1人と希望度1〜3を選びます。', notes: '仲間も対象にできます。対象別の希望度合計が最大の人を襲撃し、同点なら無作為に決まります。仲間への襲撃も成立します。他の人狼の選択や集計は表示されません。' },
+  { role: 'doctor', team: '村側', action: '夜に自分を含む1人を選び注射します。注射しないこともできます。', notes: '1回目はその夜の襲撃を防ぎます。日付・間隔・医者に関係なく試合中2回目の注射で死亡します。医者2人が同夜に注射しても死亡します。護衛では防げません。初夜は注射なしです。' },
   { role: 'seer', team: '村側', action: '夜に自分以外の生存者1人を選び、人狼かどうか調べます。', notes: '対象を選んで確定します。同じ人を再び占えます。初夜の白通知はありません。結果は本人だけが確認できます。' },
   { role: 'medium', team: '村側', action: '処刑された人が人狼かどうか、処刑後に分かります。', notes: '対象を選ぶ操作はありません。処刑なし・襲撃・途中退場・後追いでは霊媒結果は出ません。結果は本人だけに表示され、夜は確認を完了します。' },
   { role: 'knight', team: '村側', action: '夜に自分以外の生存者1人を護衛します。', notes: '対象を選んで確定します。連続護衛できるかは部屋の設定に従います。襲撃先と一致すれば犠牲者は出ません。護衛成功の理由や対象は公開されません。初夜は護衛しません。' },
@@ -41,7 +42,7 @@ export default function RulesHelp({ settings, onClose }: { settings?: HelpSettin
       {settings && <p className="rules-running-note">説明を開いている間も、ゲームと残り時間は進みます。</p>}
       {section === 'roles' && <section aria-labelledby="rules-roles-title"><h3 id="rules-roles-title">役職一覧</h3><p>村側は人狼を全員見つけ、人狼側は人間を減らすことを目指します。脱落しても、所属する陣営が勝てば勝利です。</p>
         {settings?.compositionMode==='random'&&<p className="inline-note">ランダム配役：人狼{settings.fixedWolves}人固定。候補は{settings.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。実際の配役人数は試合終了まで秘密です。</p>}
-        <div className="rules-role-list">{roles.filter(item => (item.role !== 'lover' || !settings || settings.loverRole) && (item.role !== 'hunter' || !settings || settings.hunterRole)).map(item => <article className="rules-role-card" key={item.role}>
+        <div className="rules-role-list">{roles.filter(item => (item.role !== 'lover' || !settings || settings.loverRole) && (item.role !== 'hunter' || !settings || settings.hunterRole) && (item.role !== 'doctor' || !settings || settings.doctorRole)).map(item => <article className="rules-role-card" key={item.role}>
           <RoleImage role={item.role} compact /><div className="rules-role-heading"><h4>{roleNames[item.role]}</h4><span className={item.team === '人狼側' ? 'rules-team wolves' : 'rules-team'}>{item.team}</span>{settings?.composition && <span className="rules-role-count">今回 {settings.composition[item.role] ?? 0}人</span>}</div>
           <p>{item.action}</p><p className="rules-role-notes">{item.notes}</p>
         </article>)}{(!settings||settings.wolfboundEnabled!==undefined)&&<article className="rules-role-card"><RoleImage role="wolfbound" compact/><div className="rules-role-heading"><h4>狼憑き</h4><span className="rules-team">村側</span>{settings&&<span className="rules-role-count">{settings.wolfboundEnabled?'50%で0〜1人':'今回は不使用'}</span>}</div><p>村人の中に紛れる、能力のない村側です。</p><p className="rules-role-notes">本人にも村人と表示されます。占いでは「人狼」、霊媒では「人狼ではない」と判定され、試合終了後にだけ正体が公開されます。</p></article>}</div><p className="small-note">本人の役職や仲間の名前は、ゲーム画面の「あなただけの情報」で確認してください。</p>

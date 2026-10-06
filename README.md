@@ -72,3 +72,5 @@ GitHubの接続先は https://github.com/Uichi/face-to-face-werewolf です。�
 待機室に[配役プリセットとお気に入り設定](docs/preset-settings.md)を追加しました。追加SQLは不要です。
 
 [ランダム配役モード](docs/random-composition-setup.md)を追加しました。023のSQL適用後、待機室で抽選候補を選び、人数を終了まで秘密にして遊べます。
+
+[医者の導入手順](docs/doctor-setup.md)に沿って024のSQLを追加すると、医者0〜2人を設定できます。注射回数は試合全体で累計し、2回目で死亡します。

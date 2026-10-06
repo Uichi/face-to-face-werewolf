@@ -31,7 +31,7 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -88,11 +88,11 @@ export function applySoloAction(session: SoloSession, action: string, payload: R
   throw new Error('この操作は試遊モードでは使えません。');
 }
 
-const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (['firstNight','night'].includes(phase) && role === 'baker') || (phase === 'night' && ['wolf', 'seer', 'knight'].includes(role));
+const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (['firstNight','night'].includes(phase) && role === 'baker') || (phase === 'night' && ['wolf', 'seer', 'knight', 'doctor'].includes(role));
 function targetFor(game: Game, actorId: string, preferredTargetId?: string): string {
   const actor = game.players.find(player => player.id === actorId)!;
   if ((actor.apparentRole ?? actor.role) === 'baker' && ['firstNight','night'].includes(game.phase)) return BREAD_TYPES[Math.floor(Math.random() * BREAD_TYPES.length)]!;
-  const candidates = game.players.filter(player => player.alive && player.id !== actorId
+  const candidates = game.players.filter(player => player.alive && (player.id !== actorId || game.phase==='night'&&(game.players.find(p=>p.id===actorId)?.apparentRole??game.players.find(p=>p.id===actorId)?.role)==='doctor')
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))
   );
   if (preferredTargetId === NO_EXECUTION_ID && game.day === 1 && ['vote','runoff'].includes(game.phase)
@@ -158,8 +158,29 @@ export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession 
   return session;
 }
 
-export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf' | 'seer-wolfbound' | 'medium-wolfbound' | 'thief-wolfbound' | 'hunter-execution' | 'hunter-attack' | 'hunter-lover' | 'hunter-wolf' | 'thief-hunter';
+export type CheckScenario = 'lover-execution' | 'lover-attack' | 'guard-success' | 'guard-failure' | 'runoff' | 'no-execution' | 'no-execution-runoff' | 'baker-alive' | 'baker-dead' | 'seer-wolf' | 'seer-wolfbound' | 'medium-wolfbound' | 'thief-wolfbound' | 'hunter-execution' | 'hunter-attack' | 'hunter-lover' | 'hunter-wolf' | 'thief-hunter' | 'doctor-protect' | 'doctor-delayed' | 'doctor-double' | 'doctor-hunter' | 'thief-doctor';
 export function createCheckScenario(kind: CheckScenario): SoloSession {
+  if(kind==='thief-doctor') {
+    let session=createSoloSession('thief',10);
+    const target=session.game.players.find(p=>p.role==='villager'&&p.id!==SOLO_VIEWER)!;target.role=target.initialRole=target.apparentRole='doctor';
+    session=applySoloAction(session,'select',{targetId:target.id});return completeSoloPhase(session,true);
+  }
+  if(kind.startsWith('doctor-')) {
+    let session=createSoloSession('doctor',10);const g=session.game;
+    const doctor=g.players.find(p=>p.id===SOLO_VIEWER)!;doctor.role=doctor.initialRole=doctor.apparentRole='doctor';
+    const target=g.players.find(p=>p.id!==SOLO_VIEWER&&p.role==='villager')!;
+    if(kind==='doctor-hunter')target.role=target.initialRole=target.apparentRole='hunter';
+    let other=g.players.find(p=>p.role==='villager'&&p.id!==target.id);
+    if(kind==='doctor-double'&&other)other.role=other.initialRole=other.apparentRole='doctor';
+    if(kind==='doctor-delayed'||kind==='doctor-hunter') {g.injectionCounts={[target.id]:1};g.injectionHistory=[{actorId:SOLO_VIEWER,targetId:target.id,day:1}];}
+    g.phase='night';g.phaseId++;g.day=4;g.deadline=session.now+60000;g.selections={};g.confirmed=[];
+    const guardTarget=g.players.find(p=>p.role==='villager'&&p.id!==target.id)!.id;
+    for(const p of [...g.players]) {
+      if(['wolf','seer','knight','doctor','baker'].includes(p.role))session=applySoloAction(session,'select',{targetId:p.role==='baker'?'croissant':p.role==='knight'?guardTarget:target.id,strength:2},p.id);
+      session=applySoloAction(session,'confirm',{},p.id);
+    }
+    return session;
+  }
   if (kind === 'thief-hunter') {
     let session=createSoloSession('thief',10);
     const target=session.game.players.find(p=>p.role==='villager'&&p.id!==SOLO_VIEWER)!;
@@ -179,7 +200,7 @@ export function createCheckScenario(kind: CheckScenario): SoloSession {
     if(kind==='hunter-attack') {
       session=prepareNight(session);
       for(const p of session.game.players.filter(p=>p.alive)) {
-        if(['wolf','seer','knight'].includes(p.role))session=applySoloAction(session,'select',{targetId:p.role==='knight'?session.game.players.find(x=>x.role==='villager')!.id:SOLO_VIEWER,strength:2},p.id);
+        if(['wolf','seer','knight','doctor'].includes(p.role))session=applySoloAction(session,'select',{targetId:p.role==='knight'?session.game.players.find(x=>x.role==='villager')!.id:SOLO_VIEWER,strength:2},p.id);
         session=applySoloAction(session,'confirm',{},p.id);
       }
     } else {

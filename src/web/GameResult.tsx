@@ -19,7 +19,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   const villagers = game.players.filter(p => p.alive && p.role !== 'wolf').length;
   const ending = game.ending;
   const lastPlayer = ending && game.players.find(p => p.id === ending.playerId);
-  const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : ending?.cause === 'shot' ? '狩人に撃たれました' : '途中脱落しました';
+  const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : ending?.cause === 'injection' ? '2回目の注射を受けたため死亡しました' : ending?.cause === 'shot' ? '狩人に撃たれました' : '途中脱落しました';
   const finalVotes = ending?.cause === 'execution' && game.voteResult?.executedId === ending.playerId
     ? game.voteResult.counts[ending.playerId] ?? 0 : null;
   const finalVoteRows = finalVotes === null ? [] : Object.entries(game.voteResult!.counts).sort(([aId, a], [bId, b]) =>

@@ -5,7 +5,7 @@ import { roleNames } from './types.ts';
 import { createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
-const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter'];
+const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor'];
 const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', hunter:'狩人の発砲', finished: '試合終了' } as const;
 
 export default function SoloTest({ onExit }: { onExit: () => void }) {
@@ -29,6 +29,7 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
     <button className="secondary-button" onClick={()=>update(createRandomSoloSession(playerCount))}>ランダム配役で試遊する（自分の役職も抽選）</button>
     <div className="solo-scenarios"><h2>確認したい場面から始める</h2><p>通常と同じ判定処理を通して、選んだ場面をすぐ表示します。</p>
       {role !== 'thief' && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}
+      {([['doctor-protect','医者の注射で襲撃を防ぐ'],['doctor-delayed','数日後の2回目の注射で死亡'],['doctor-double','医者2人が同夜に注射'],['doctor-hunter','2回目の注射で狩人が発砲'],['thief-doctor','怪盗が医者を奪う']] as const).map(([kind,label])=><button className="secondary-button" key={kind} onClick={()=>update(createCheckScenario(kind))}>{label}</button>)}
       <button className="secondary-button" onClick={() => update(createEndingScenario('village'))}>人狼を処刑 → 村側勝利</button>
       <button className="secondary-button" onClick={() => update(createEndingScenario('wolves'))}>村人を処刑 → 人狼側勝利</button>
       <button className="secondary-button" onClick={() => update(createCheckScenario('lover-execution'))}>恋人を処刑 → 相方が後追い</button>

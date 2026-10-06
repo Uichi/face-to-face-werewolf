@@ -17,23 +17,23 @@ test('狩人SQL: 新規配役・死亡後発砲・夜の確定・得点・権限
   if(file.includes('0013_baker'))await db.exec(`create or replace function app_private.assert_site_access()returns void language plpgsql as $$begin return;end$$`);
   await db.exec(await readFile(new URL(file,dir),'utf8'));
  }
- await db.exec(await readFile(new URL('202610060023_random_composition.sql',dir),'utf8'));
+ await db.exec(await readFile(new URL('202610060024_doctor.sql',dir),'utf8'));
  const users=Array.from({length:5},()=>randomUUID());for(const u of users)await db.query('insert into auth.users values($1)',[u]);
  const user=async(i:number)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[users[i]!]);await db.exec('set role authenticated');};
  const raw=async(fn:string,action:string,payload:object)=>(await db.query<{data:any}>(`select public.${fn}($1,$2::jsonb)data`,[action,JSON.stringify(payload)])).rows[0]!.data;
- await user(0);let response=await raw('lobby_command_random','create',{nickname:'主催',requestId:randomUUID()});
- for(let i=1;i<5;i++){await user(i);response=await raw('lobby_command_random','join',{code:response.room.code,nickname:'参加'+i});}
+ await user(0);let response=await raw('lobby_command_doctor','create',{nickname:'主催',requestId:randomUUID()});
+ for(let i=1;i<5;i++){await user(i);response=await raw('lobby_command_doctor','join',{code:response.room.code,nickname:'参加'+i});}
  const roomId=response.room.id;const ids=response.room.members.map((m:any)=>m.id) as string[];
  const state=async()=>{await db.exec('reset role');return(await db.query<{state:Game}>('select state from app_private.games where room_id=$1',[roomId])).rows[0]!.state;};
  const save=async(g:Game)=>{await db.exec('reset role');await db.query("insert into app_private.games(room_id,state)values($1,$2::jsonb)on conflict(room_id)do update set state=excluded.state",[roomId,JSON.stringify(g)]);await db.query("update app_private.rooms set status='playing'where id=$1",[roomId]);};
- const call=async(i:number,action:string,extra:object={},requestId=randomUUID())=>{const g=await state();await user(i);return response=await raw('game_command_random',action,{roomId,gameId:g.id,phaseId:g.phaseId,requestId,...extra});};
+ const call=async(i:number,action:string,extra:object={},requestId=randomUUID())=>{const g=await state();await user(i);return response=await raw('game_command_doctor',action,{roomId,gameId:g.id,phaseId:g.phaseId,requestId,...extra});};
  const base=(roles:string[])=>{const g=createGame({id:randomUUID(),hostId:ids[0]!,playerIds:ids,composition:DEFAULT_COMPOSITIONS[5]!},0,()=>0);g.players=roles.map((role,i)=>({id:ids[i]!,role:role as any,initialRole:role as any,apparentRole:role as any,alive:true}));g.phase='vote';g.phaseId=12;g.deadline=Date.now()+60000;return g;};
  const execute=async()=>{for(let i=0;i<5;i++){await call(i,'select',{targetId:ids[i===0?1:0]});await call(i,'confirm');}};
  try{
  await t.test('10役職配役と勝利点を保存して開始、旧操作口は禁止',async()=>{
-  await user(0);response=await raw('lobby_command_random','settings',{roomId,revision:response.room.revision,composition:{...DEFAULT_COMPOSITIONS[5],villager:2,hunter:1},discussionMinutes:3});assert.equal(response.room.composition.hunter,1);assert.equal(response.room.victoryPoints.hunter,5);
-  const startId=randomUUID();response=await raw('game_command_random','start',{roomId,revision:response.room.revision,requestId:startId});assert.equal(response.room.hunterRole,true);assert.equal(response.game.public.composition.hunter,1);assert.equal(response.game.public.resultConfirmation,false);assert.equal(response.game.public.players.some((p:any)=>'role'in p),false);
-  const before=await state();await user(0);await raw('game_command_random','start',{roomId,requestId:startId});assert.deepEqual(await state(),before);
+  await user(0);response=await raw('lobby_command_doctor','settings',{roomId,revision:response.room.revision,composition:{...DEFAULT_COMPOSITIONS[5],villager:2,hunter:1},discussionMinutes:3});assert.equal(response.room.composition.hunter,1);assert.equal(response.room.victoryPoints.hunter,5);
+  const startId=randomUUID();response=await raw('game_command_doctor','start',{roomId,revision:response.room.revision,requestId:startId});assert.equal(response.room.hunterRole,true);assert.equal(response.game.public.composition.hunter,1);assert.equal(response.game.public.resultConfirmation,false);assert.equal(response.game.public.players.some((p:any)=>'role'in p),false);
+  const before=await state();await user(0);await raw('game_command_doctor','start',{roomId,requestId:startId});assert.deepEqual(await state(),before);
   await user(0);await assert.rejects(()=>raw('game_command_wolfbound','get',{roomId}),/permission denied/);
  });
  await t.test('処刑後は勝敗を保留し本人のみ発砲、再送でも累計が増えない',async()=>{
@@ -42,7 +42,7 @@ test('狩人SQL: 新規配役・死亡後発砲・夜の確定・得点・権限
   await assert.rejects(()=>call(1,'select',{targetId:ids[2]}),/狩人本人/);await assert.rejects(()=>call(0,'cancelShot'),/期限後/);
   await call(0,'select',{targetId:ids[2]});await call(0,'select',{targetId:ids[1]});const phaseId=(await state()).phaseId;const req=randomUUID();await call(0,'confirm',{},req);
   g=await state();assert.equal(g.phase,'finished');assert.equal(g.winner,'village');assert.equal(g.scores!.find(s=>s.playerId===ids[0])!.contribution,1);assert.equal(g.lastElimination!.cause,'shot');assert.deepEqual(g.publicLog!.map(e=>e.kind),['execution','hunterReady','shot']);
-  const points=response.room.members.map((m:any)=>m.points);await user(0);response=await raw('game_command_random','confirm',{roomId,gameId:g.id,phaseId,requestId:req});assert.deepEqual(response.room.members.map((m:any)=>m.points),points);
+  const points=response.room.members.map((m:any)=>m.points);await user(0);response=await raw('game_command_doctor','confirm',{roomId,gameId:g.id,phaseId,requestId:req});assert.deepEqual(response.room.members.map((m:any)=>m.points),points);
   const waiting=await call(0,'rematch');assert.equal(waiting.room.status,'waiting');assert.equal(waiting.room.composition.hunter,1);assert.deepEqual(waiting.room.members.map((m:any)=>m.points),points);
  });
  await t.test('襲撃後の発砲は護衛を無視、パンと生存点は発砲後に確定',async()=>{
@@ -73,8 +73,8 @@ test('狩人SQL: 新規配役・死亡後発砲・夜の確定・得点・権限
   await save(base(['villager','wolf','seer','villager','villager']));
   for(let i=0;i<5;i++){await call(i,'select',{targetId:ids[i===1?0:1]});await call(i,'confirm');}
   assert.equal((await state()).winner,'village');response=await call(0,'rematch');
-  await user(0);await assert.rejects(()=>raw('lobby_command_random','settings',{roomId,revision:response.room.revision,discussionMinutes:3,composition:{...DEFAULT_COMPOSITIONS[5],villager:1,hunter:2}}),/0〜1/);
-  await assert.rejects(()=>raw('lobby_command_random','settings',{roomId,revision:response.room.revision,discussionMinutes:3,wolfboundEnabled:true,composition:{villager:0,wolf:1,seer:1,medium:1,knight:1,madman:0,lover:0,baker:0,thief:0,hunter:1}}),/村人が1人以上/);
+  await user(0);await assert.rejects(()=>raw('lobby_command_doctor','settings',{roomId,revision:response.room.revision,discussionMinutes:3,composition:{...DEFAULT_COMPOSITIONS[5],villager:1,hunter:2}}),/0〜1/);
+  await assert.rejects(()=>raw('lobby_command_doctor','settings',{roomId,revision:response.room.revision,discussionMinutes:3,wolfboundEnabled:true,composition:{villager:0,wolf:1,seer:1,medium:1,knight:1,madman:0,lover:0,baker:0,thief:0,hunter:1}}),/村人が1人以上/);
   const reset=await raw('score_command','reset',{roomId,revision:response.room.revision});assert.equal(reset.room.members.every((m:any)=>m.points===0),true);
  });
  await t.test('怪盗が狼憑きの村人を奪う、偽占い・偽護衛・偽襲撃は影響しない',async()=>{
@@ -100,7 +100,7 @@ test('狩人SQL: 新規配役・死亡後発砲・夜の確定・得点・権限
  await t.test('サイト権限なし・部外者・直接秘密取得は拒否',async()=>{
   await user(0);await assert.rejects(()=>db.query('select state from app_private.games'),/permission denied/);await assert.rejects(()=>db.query("select app_private.hunter_shot('{}'::jsonb,0,true)"),/permission denied/);
   await db.exec('reset role');await db.exec(`create or replace function app_private.assert_site_access()returns void language plpgsql as $$begin raise exception'SITE_ACCESS_REQUIRED';end$$`);
-  await user(0);await assert.rejects(()=>raw('game_command_random','get',{roomId}),/SITE_ACCESS_REQUIRED/);await assert.rejects(()=>raw('lobby_command_random','get',{roomId}),/SITE_ACCESS_REQUIRED/);
+  await user(0);await assert.rejects(()=>raw('game_command_doctor','get',{roomId}),/SITE_ACCESS_REQUIRED/);await assert.rejects(()=>raw('lobby_command_doctor','get',{roomId}),/SITE_ACCESS_REQUIRED/);
  });
  }finally{await db.close();}
 });
