@@ -74,3 +74,5 @@ GitHubの接続先は https://github.com/Uichi/face-to-face-werewolf です。�
 [ランダム配役モード](docs/random-composition-setup.md)を追加しました。023のSQL適用後、待機室で抽選候補を選び、人数を終了まで秘密にして遊べます。
 
 [医者の導入手順](docs/doctor-setup.md)に沿って024のSQLを追加すると、医者0〜2人を設定できます。注射回数は試合全体で累計し、2回目で死亡します。
+
+[ボディービルダーの導入手順](docs/bodybuilder-setup.md)に沿って025のSQLを追加すると、襲撃に1回だけ耐える村側の役職を0〜1人設定できます。

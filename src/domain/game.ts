@@ -40,6 +40,7 @@ export type Game = {
   breadDelivery?: { day: number; breadType: BreadType } | null;
   consecutiveGuard: boolean;
   lastGuardTargets: Record<string, string>;
+  enduranceUsed?: Record<string, number>;
   injectionCounts?: Record<string,number>;
   injectionHistory?: {actorId:string;targetId:string;day:number}[];
   nightDeaths?: Elimination[];
@@ -214,11 +215,12 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       attacks: living.filter(p => p.role === 'wolf').map(p => ({ ...actionOf(p), strength: game.attackStrengths[p.id]! })),
       divination: seer ? actionOf(seer) : null,
       protection: knight ? actionOf(knight) : null,
-      injections: living.filter(p=>p.role==='doctor').map(actionOf), injectionCounts: game.injectionCounts,
+      injections: living.filter(p=>p.role==='doctor').map(actionOf), injectionCounts: game.injectionCounts, enduranceUsed: game.enduranceUsed,
     }, random);
     if (result.divination?.isWolf && living.find(player => player.id === result.divination!.targetId)?.role === 'wolf') recordPoint(game.scoring, result.divination.seerId, 'contribution', result.divination.targetId);
     if (knight && result.knightSuccess) recordPoint(game.scoring, knight.id, 'contribution');
     for(const id of result.doctorSuccessIds)recordPoint(game.scoring,id,'contribution');
+    if(result.enduranceSavedId)(game.enduranceUsed??={})[result.enduranceSavedId]=game.day;
     game.injectionCounts=result.injectionCounts;
     for(const p of living.filter(p=>shownRole(p)==='doctor'))(game.injectionHistory??=[]).push({actorId:p.id,targetId:game.selections[p.id]!,day:game.day});
     game.players = result.players;
@@ -398,9 +400,10 @@ export function viewFor(game: Game, viewerId: string) {
     followedIds: (game.phase === 'execution' && game.voteResult?.executedId === game.lastElimination?.playerId && game.lastElimination?.cause === 'execution') || (game.phase === 'morning' && game.victimId && game.lastElimination?.cause === 'attack') ? [...(game.lastElimination?.followedIds ?? [])] : [],
     ending: isFinished ? structuredClone(game.lastElimination ?? null) : null,
   };
-  if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null };
+  const personalNotice=isFinished&&viewer.alive&&viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId)?{kind:'endurance' as const,day:game.enduranceUsed![viewerId]!}:null;
+  if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null, personalNotice };
   return {
-    public: publicInfo,
+    public: publicInfo, personalNotice,
     private: { role: shownRole(viewer), actualRole: game.phase === 'firstNight' && viewer.initialRole === 'thief' ? viewer.role : undefined,
       thiefExchange: viewer.initialRole === 'thief' && viewer.role !== 'thief' ? {
         targetId: game.players.find(p => p.decoy)?.id ?? null, stolenRole: viewer.role,
@@ -411,6 +414,7 @@ export function viewFor(game: Game, viewerId: string) {
       selection: Object.hasOwn(game.selections, viewerId) ? game.selections[viewerId] : null,
       lastGuardTargetId: shownRole(viewer) === 'knight' ? game.lastGuardTargets[viewerId] ?? null : null,
       attackStrength: game.attackStrengths[viewerId] ?? null,
+      endurance: shownRole(viewer)==='bodybuilder'?{used:viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId), day:viewer.role==='bodybuilder'?game.enduranceUsed?.[viewerId]??null:null}:null,
       injectionHistory: shownRole(viewer)==='doctor'?structuredClone((game.injectionHistory??[]).filter(h=>h.actorId===viewerId)):[],
       results: structuredClone(game.secrets.filter(s => s.recipientId === viewerId)),
     },

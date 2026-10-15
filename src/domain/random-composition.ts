@@ -1,6 +1,6 @@
 import { DEFAULT_COMPOSITIONS, validateComposition } from './rules.ts';
 import type { Composition, Role, RandomIndex } from './rules.ts';
-export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor'];
+export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor','bodybuilder'];
 export type CompositionMode = 'standard' | 'custom' | 'random';
 export function randomCombinations(count: number, candidates: readonly Role[]): Composition[] {
   if (!DEFAULT_COMPOSITIONS[count] || new Set(candidates).size !== candidates.length || candidates.some(role=>!RANDOM_ROLES.includes(role))) throw new Error('抽選候補または人数が不正です');
@@ -13,7 +13,7 @@ export function randomCombinations(count: number, candidates: readonly Role[]): 
     const role=ordered[index]!;
     for(const amount of role==='doctor'?[0,1,2]:role==='lover'?[0,2]:[0,1])enumerate(index+1,{...comp,[role]:amount,villager:comp.villager-amount});
   };
-  enumerate(0,{villager:count-wolves,wolf:wolves,seer:0,medium:0,knight:0,madman:0,lover:0,baker:0,thief:0,hunter:0,doctor:0});
+  enumerate(0,{villager:count-wolves,wolf:wolves,seer:0,medium:0,knight:0,madman:0,lover:0,baker:0,thief:0,hunter:0,doctor:0,bodybuilder:0});
   return combinations;
 }
 export function randomComposition(count:number,candidates:readonly Role[],random:RandomIndex):Composition {

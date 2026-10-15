@@ -1,24 +1,24 @@
 // Server-only rules. Never serialize this module's full input state to clients.
-export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor';
+export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor' | 'bodybuilder';
 export type Team = 'village' | 'wolves';
-export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor'>, number> & { thief?: number; hunter?: number; doctor?: number };
+export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number };
 export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean; wolfbound?: boolean; initialWolfbound?: boolean };
 export type Choice = { actorId: string; targetId: string };
 export type AttackChoice = Choice & { strength?: 1 | 2 | 3 };
 // Production callers must supply a cryptographically secure uniform integer source.
 export type RandomIndex = (exclusiveMax: number) => number;
 
-export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor'];
+export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor', 'bodybuilder'];
 export const DEFAULT_COMPOSITIONS: Readonly<Record<number, Readonly<Composition>>> = Object.freeze({
-  5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  7: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 1, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  8: Object.freeze({ villager: 2, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  9: Object.freeze({ villager: 3, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  10: Object.freeze({ villager: 4, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  11: Object.freeze({ villager: 5, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  12: Object.freeze({ villager: 5, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
-  13: Object.freeze({ villager: 6, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0 }),
+  5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  7: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 1, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  8: Object.freeze({ villager: 2, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  9: Object.freeze({ villager: 3, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  10: Object.freeze({ villager: 4, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  11: Object.freeze({ villager: 5, wolf: 2, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  12: Object.freeze({ villager: 5, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
+  13: Object.freeze({ villager: 6, wolf: 3, seer: 1, medium: 1, knight: 1, madman: 1, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
 });
 
 function requireRule(condition: unknown, message: string): asserts condition {
@@ -39,7 +39,7 @@ export function validateComposition(count: number, composition: Composition): vo
   requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、人間（狂人を含む）より少なくしてください');
   requireRule(composition.lover === 0 || composition.lover === 2, '恋人は0人か2人で設定してください');
   requireRule((composition.doctor ?? 0) <= 2, '医者は0〜2人です');
-  requireRule(['seer', 'medium', 'knight', 'madman', 'baker', 'thief', 'hunter'].every(role => (composition[role as Role] ?? 0) <= 1), '占い師・霊媒師・騎士・狂人・パン屋・怪盗・狩人は各0〜1人です');
+  requireRule(['seer', 'medium', 'knight', 'madman', 'baker', 'thief', 'hunter', 'bodybuilder'].every(role => (composition[role as Role] ?? 0) <= 1), '占い師・霊媒師・騎士・狂人・パン屋・怪盗・狩人・ボディービルダーは各0〜1人です');
 }
 
 export function assignRoles(ids: readonly string[], composition: Composition, random: RandomIndex): Player[] {
@@ -103,7 +103,7 @@ export type NightActions = {
   attacks: readonly AttackChoice[];
   divination: Choice | null;
   protection: Choice | null;
-  injections?: readonly Choice[]; injectionCounts?: Record<string, number>;
+  injections?: readonly Choice[]; injectionCounts?: Record<string, number>; enduranceUsed?: Record<string, number>;
 };
 
 export function resolveNight(players: readonly Player[], actions: NightActions, random: RandomIndex) {
@@ -139,7 +139,8 @@ export function resolveNight(players: readonly Player[], actions: NightActions, 
   for (const choice of injections) if(choice.targetId!=='__no_injection__') {injectionCounts[choice.targetId]=(injectionCounts[choice.targetId]??0)+1;injected.add(choice.targetId);}
   const overdoses = alive.filter(p=>injected.has(p.id) && injectionCounts[p.id]!>=2).map(p=>p.id);
   const protectedByDoctor = injected.has(attackedId) && !overdoses.includes(attackedId);
-  const victimId = protectedPlayer?.id === attackedId || protectedByDoctor || overdoses.includes(attackedId) ? null : attackedId;
+  const enduranceSavedId = alive.some(p=>p.id===attackedId&&p.role==='bodybuilder') && !Object.hasOwn(actions.enduranceUsed??{},attackedId) && protectedPlayer?.id!==attackedId && !protectedByDoctor && !overdoses.includes(attackedId) ? attackedId : null;
+  const victimId = enduranceSavedId || protectedPlayer?.id === attackedId || protectedByDoctor || overdoses.includes(attackedId) ? null : attackedId;
   const direct = alive.filter(p=>p.id===victimId || overdoses.includes(p.id));
   const directIds=new Set(direct.map(p=>p.id));
   const followed = direct.find(p=>p.role==='lover') ? alive.filter(p=>p.role==='lover'&&!directIds.has(p.id)).map(p=>p.id) : [];
@@ -149,7 +150,7 @@ export function resolveNight(players: readonly Player[], actions: NightActions, 
   const knightSuccess = protectedPlayer?.id===attackedId && nextPlayers.some(p=>p.id===attackedId&&p.alive);
   // The caller must filter this private result by recipient and life status.
   const divination = divined ? { seerId: actions.divination!.actorId, targetId: divined.id, isWolf: divined.role === 'wolf' || divined.wolfbound === true } : null;
-  return { players: nextPlayers, victimId, followedIds: deaths.find(d=>d.cause==='attack')?.followedIds ?? [], deaths, injectionCounts, doctorSuccessIds, knightSuccess, divination, winner: getWinner(nextPlayers) };
+  return { players: nextPlayers, victimId, followedIds: deaths.find(d=>d.cause==='attack')?.followedIds ?? [], deaths, injectionCounts, doctorSuccessIds, knightSuccess, enduranceSavedId, divination, winner: getWinner(nextPlayers) };
 }
 
 export function eliminate(players: readonly Player[], targetId: string, reason: 'execution' | 'disconnect' | 'attack' | 'shot' | 'injection') {
