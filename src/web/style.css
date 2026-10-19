@@ -484,6 +484,20 @@ footer small { margin-left: auto; font-size: 12px; }
   .strength-picker { grid-template-columns: 1fr; }
   .victory-points { grid-template-columns: 1fr; }
 }
+/* The common back never carries a role name; private content waits for the turn. */
+.role-reveal-card { width: min(100%,240px); aspect-ratio: 2 / 3; perspective: 1100px; margin: 16px auto 20px; }
+.role-reveal-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateY(0deg); }
+.role-reveal-back, .role-reveal-front { position: absolute; inset: 0; overflow: hidden; border: 1px solid var(--line-gold); border-radius: 11px; background: var(--surface-inset); backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 8px 24px #0006; }
+.role-reveal-front { transform: rotateY(180deg); }
+.role-reveal-card img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.role-reveal-card.is-turning .role-reveal-inner { animation: role-card-turn 650ms cubic-bezier(.35,.05,.3,1) both; }
+.role-reveal-card.is-open .role-reveal-inner { transform: rotateY(180deg); }
+.role-reveal-card.is-open .role-reveal-back { visibility: hidden; }
+.card-back-fallback, .card-front-fallback { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; width: 100%; height: 100%; padding: 20px; text-align: center; color: var(--gold-bright); font-family: var(--serif); font-size: 25px; }
+.card-back-fallback { font-size: 64px; }
+.card-back-fallback span { font-size: 20px; }
+@keyframes role-card-turn { 0%, 12% { transform: rotateY(0deg); } 100% { transform: rotateY(180deg); } }
 @media (prefers-reduced-motion: reduce) {
+  .role-reveal-card .role-reveal-inner { transform: rotateY(180deg); }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
