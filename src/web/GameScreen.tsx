@@ -1,3 +1,4 @@
+import ResultPresentation from './ResultPresentation.tsx';
 import RoleRevealCard from './RoleRevealCard.tsx';
 import { claimRoleReveal } from './role-reveal.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -133,7 +134,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    else void send('confirm');
  }}>{priv?.confirmed?'確認済み・みんなを待っています':busy?'送信中…':hunterShot?'この人への発砲を確定':vote?'この人への投票を確定':breadChoice?'このパンを焼く':night&&ability?'この対象で確定':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了'}</button>;
 
- return <div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
+ return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
    <div className="game-top" key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1>{phaseNames[phase]}</h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
    {phase!=='finished'&&<aside className={`current-task ${task.waiting?'task-waiting':''}`} aria-live="polite" aria-atomic="true"><span>今やること</span><h2>{task.title}</h2><p>{task.detail}</p></aside>}
    {offline&&<div className="message" role="status">接続を確認しています。操作の結果を確認できるまで、このままお待ちください。</div>}
@@ -178,7 +179,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
      </div><details><summary>復帰できない参加者がいるとき</summary><p>対象者を脱落扱いにします。投票・夜の操作中は全員の操作を取り消し、その段階をやり直します。</p>{alive.map(p=><button className="remove-player" disabled={busy} key={p.id} onClick={()=>setDialog({text:`${name(p.id)}さんを脱落扱いにしますか？ この試合には復帰できません。`,action:'remove',targetId:p.id})}>{name(p.id)}さんを脱落扱いにする</button>)}</details></section>}
    </>}
    {dialog&&<Confirmation onClose={()=>setDialog(null)}><h2 id="confirm-title">確認してください</h2><p>{dialog.text}</p><button className="primary" autoFocus disabled={busy} onClick={()=>void send(dialog.action,dialog.targetId?{targetId:dialog.targetId}:{})}>確定する</button><button className="secondary-button" onClick={()=>setDialog(null)}>戻る</button></Confirmation>}
- </div>;
+ </div></ResultPresentation>;
 }
 
 function Confirmation({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
