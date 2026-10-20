@@ -515,3 +515,8 @@ footer small { margin-left: auto; font-size: 12px; }
 @keyframes dawn-surface { from { background:var(--night); } to { background:var(--surface); } }
 @keyframes result-arrive { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .result-presentation,.result-scene { animation:none; } .solo-result-replay { display:none; } }
+.presentation-position { color:var(--muted); font-size:14px; margin-bottom:20px; font-variant-numeric:tabular-nums; }
+.presentation-reading-state { color:var(--muted); font-size:14px; line-height:1.7; margin:20px 0 0; }
+.presentation-controls { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.result-presentation .presentation-controls button { margin-top:16px; padding:12px 8px; font-size:14px; }
+.result-presentation .presentation-skip { margin-top:12px; color:var(--muted); }

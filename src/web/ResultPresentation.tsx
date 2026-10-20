@@ -9,6 +9,7 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
   const previous = useRef<GameView['public'] | null>(null);
   const [frames, setFrames] = useState<ResultFrame[]>([]);
   const [index, setIndex] = useState(0);
+  const [held, setHeld] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const current = frames[index];
   const phase = useRef(game.phaseId);
@@ -20,13 +21,13 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     // The first snapshot after mounting/reconnecting is a baseline, never a replay.
     if (!old) return;
     const next = resultFrames(old, game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者');
-    if (next.length || changed) { setFrames(next); setIndex(0); }
+    if (next.length || changed) { setFrames(next); setIndex(0); setHeld(false); }
   }, [game, room.members, paused]);
   useEffect(() => {
-    if (!current) return;
+    if (!current || held) return;
     const timer = setTimeout(() => setIndex(value => value + 1), current.duration);
     return () => clearTimeout(timer);
-  }, [current]);
+  }, [current, held]);
   useEffect(() => {
     if (!current) return;
     const node = dialog.current; node?.showModal();
@@ -41,11 +42,14 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     document.addEventListener('visibilitychange', visible); window.addEventListener('offline', suspend); media.addEventListener('change', reduced);
     return () => { document.removeEventListener('visibilitychange', visible); window.removeEventListener('offline', suspend); media.removeEventListener('change', reduced); };
   }, []);
-  return <><div inert={!!current} aria-hidden={current ? true : undefined}>{allowReplay && ['execution','morning','hunter','finished'].includes(game.phase) && <button className="secondary-button solo-result-replay" onClick={() => { setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && <dialog ref={dialog} className={`result-presentation ${frames[0]?.kind === 'dawn' ? 'from-night' : ''}`} aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
+  return <><div inert={!!current} aria-hidden={current ? true : undefined}>{allowReplay && ['execution','morning','hunter','finished'].includes(game.phase) && <button className="secondary-button solo-result-replay" onClick={() => { setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); setHeld(false); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && <dialog ref={dialog} className={`result-presentation ${frames[0]?.kind === 'dawn' ? 'from-night' : ''}`} aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
     <div className={`result-scene scene-${current.kind} ${current.team ?? ''}`} key={current.id}>
-      <span className="section-number">{current.kind === 'dawn' ? '夜明け' : current.kind === 'victory' ? '決着' : '公開された出来事'}</span>
+      <div className="presentation-position" aria-label={`全${frames.length}件中${index + 1}件目`}>{index + 1} / {frames.length}</div>
+      <span className="section-number">{current.day !== undefined ? `${current.day}日目 · ` : ''}{current.label ?? '公開された出来事'}</span>
       <h2 id="presentation-title">{current.title}</h2><p id="presentation-detail" role="status">{current.detail}</p>
     </div>
-    <button className="secondary-button" autoFocus onClick={() => setFrames([])}>演出をスキップ</button>
+    <p className="presentation-reading-state">{held ? '自動送りを停止中です。読めたら「次へ」を押してください。' : '順番に自動で表示します。止めて読むこともできます。'}</p>
+    <div className="presentation-controls"><button className="secondary-button" aria-pressed={held} onClick={() => setHeld(value => !value)}>{held ? '自動送りを再開' : '自動送りを止める'}</button><button className="primary" autoFocus onClick={() => setIndex(value => Math.min(value + 1, frames.length))}>{index === frames.length - 1 ? '結果を見る' : '次へ'}</button></div>
+    <button className="text-button presentation-skip" onClick={() => setFrames([])}>演出をスキップ</button>
   </dialog>}</>;
 }
