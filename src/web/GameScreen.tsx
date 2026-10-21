@@ -1,3 +1,5 @@
+import ActionSelection from './ActionSelection.tsx';
+import { actionAdvice, actionChoice, breadNames } from './action-choice.ts';
 import ResultPresentation from './ResultPresentation.tsx';
 import RoleRevealCard from './RoleRevealCard.tsx';
 import { claimRoleReveal } from './role-reveal.ts';
@@ -18,7 +20,6 @@ import type { BreadType } from '../domain/game.ts';
 
 type Pending = { action: string; payload: Record<string, unknown> };
 const phaseNames = { roles: '役職を確認', firstNight: '最初の夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '投票の結果', night: '夜の行動', morning: '朝になりました', hunter: '狩人の最後の発砲', finished: '試合終了' };
-const breadNames: Record<BreadType,string> = { shokupan:'食パン', croissant:'クロワッサン', melonpan:'メロンパン', currypan:'カレーパン', anpan:'あんパン', surprise:'おまかせ' };
 const roleDetails: Record<Role, string> = {
  bodybuilder: 'あなたは村側です。試合中1回だけ、人狼の襲撃に自動で耐えます。騎士・医者が守った場合は消費しません。処刑・発砲・2回目の注射・後追いには耐えられません。夜は確認だけ行います。',
  doctor: 'あなたは村側です。自分を含む1人に注射するか、注射しないを選べます。1回目はその夜の襲撃を防ぎ、誰からでも試合中2回目の注射で死亡します。初夜は注射しません。',
@@ -56,6 +57,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const lastRevision = useRef(-1);
  const gameRef = useRef<GameView | null>(null);
  const me = room.viewerId;
+ useEffect(() => { const strength=game?.private?.attackStrength; setWolfStrength(strength===1||strength===2||strength===3?strength:2); }, [game?.public.id, game?.public.phaseId, game?.private?.attackStrength]);
  const apply = useCallback((result: GameResponse) => {
    if (!active.current || result.room.revision < lastRevision.current) return;
    lastRevision.current = result.room.revision;
@@ -75,15 +77,16 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    const tick = setInterval(() => { setClock(Date.now()); }, 500);
    const poll = localDriver ? 0 : window.setInterval(() => { void refresh(); }, 2000);
    const stop = localDriver ? () => {} : watchRoom(room.id, () => { void refresh(); });
-   const visible = () => { if (document.visibilityState !== 'visible') setRevealed(false); else void refresh(); };
-   const blur = () => setRevealed(false);
+   const conceal = () => { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); };
+   const visible = () => { if (document.visibilityState !== 'visible') conceal(); else void refresh(); };
+   const blur = conceal;
    document.addEventListener('visibilitychange', visible); window.addEventListener('blur', blur); window.addEventListener('online', visible);
    return () => { active.current = false; clearInterval(tick); if (poll) clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
  }, [refresh, room.id, localDriver]);
  useEffect(() => { if (localDriver) apply(localDriver.response); }, [localDriver?.response, apply, localDriver]);
  useEffect(() => { setRevealed(false); setFlipping(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
- useEffect(() => { if (helpOpen) setRevealed(false); }, [helpOpen]);
- useEffect(() => { if (!revealed) return; const timer=setTimeout(() => setRevealed(false), 20_000); return () => clearTimeout(timer); }, [revealed]);
+ useEffect(() => { if (helpOpen) { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); } }, [helpOpen]);
+ useEffect(() => { if (!revealed) return; const timer=setTimeout(() => { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); }, 20_000); return () => clearTimeout(timer); }, [revealed]);
 
  async function send(action: string, extra: Record<string, unknown> = {}, retry?: Pending) {
    if (sending.current || !gameRef.current) return;
@@ -93,7 +96,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    if (action !== 'select') setRevealed(false);
    try { apply(await (localDriver ? localDriver.command(command.action, command.payload) : gameCommand(command.action, command.payload))); setPending(null); }
    catch (e) {
-     if (active.current) { setError((e as Error).message); setPending(e instanceof GameError && e.retryable ? command : null); }
+     if (active.current) { const strength=gameRef.current?.private?.attackStrength; setWolfStrength(strength===1||strength===2||strength===3?strength:2); setError((e as Error).message); setPending(e instanceof GameError && e.retryable ? command : null); }
    } finally { sending.current = false; if (active.current) setBusy(false); if (!localDriver) void refresh(); }
  }
  if (!game) return <section className="panel game-loading"><h1>試合に接続しています</h1><p role="status">{error || '少しお待ちください。'}</p><button className="primary" onClick={() => void refresh()}>再接続</button></section>;
@@ -118,21 +121,24 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const candidates=alive.filter(p=>(p.id!==me || night&&role==='doctor') && (phase!=='runoff'||pub.runoffIds.includes(p.id)));
  const canVoteNoExecution=!!(room.firstDayNoExecution||localDriver)&&vote&&pub.day===1&&(phase==='vote'||pub.runoffIds.includes(NO_EXECUTION_ID));
  const canSelect=(self.alive || hunterShot) && (hunterShot || vote || thiefChoice || (night && ability) || breadChoice) && !priv?.confirmed;
- const blockedGuardId=night&&role==='knight'&&pub.consecutiveGuard===false?priv?.lastGuardTargetId:null;
+ const blockedGuardId=night&&role==='knight'&&(pub.consecutiveGuard??room.consecutiveGuard)===false?priv?.lastGuardTargetId:null;
+ const choice=priv ? actionChoice(phase,role,priv.selection,id=>name(id),priv.attackStrength) : null;
+ const selectionCard=choice&&priv ? <ActionSelection choice={choice} confirmed={priv.confirmed} busy={busy} pending={!!pending} offline={offline} failed={!!error}/> : null;
+ const advice=actionAdvice(hunterShot?'hunter':role,pub.consecutiveGuard??room.consecutiveGuard);
  const openPrivate=()=>{
-   if(revealed){setRevealed(false);setFlipping(false);return;}
+   if(revealed){setRevealed(false);setFlipping(false);setDialog(value=>value?.action==='confirm'?null:value);return;}
    let storage: Storage | undefined;
    try { storage=window.localStorage; } catch { /* Keep working in private browsing. */ }
    const first=claimRoleReveal(pub.id,me,storage);
    const animate=first&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
    setFlipping(animate);setRevealed(true);if(!animate)setRoleSeen(true);
  };
- const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=>{const blocked=p.id===blockedGuardId;return <button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending||blocked} onClick={()=>void send('select',{targetId:p.id,...(night&&role==='wolf'?{strength:wolfStrength}:{})})}>{name(p.id)}<span>{blocked?'前夜に護衛':priv?.selection===p.id?'選択中':'選ぶ'}</span></button>})}{night&&role==='doctor'&&<button className={`target-button ${priv?.selection==='__no_injection__'?'selected':''}`} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:'__no_injection__'})}>注射しない</button>}{canVoteNoExecution&&<button className={`target-button no-execution ${priv?.selection==='__no_injection__'?'今夜は注射しないで確定しますか？':priv?.selection===NO_EXECUTION_ID?'selected':''}`} aria-pressed={priv?.selection===NO_EXECUTION_ID} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:NO_EXECUTION_ID})}>誰も処刑しない<span>{priv?.selection==='__no_injection__'?'今夜は注射しないで確定しますか？':priv?.selection===NO_EXECUTION_ID?'選択中':'選ぶ'}</span></button>}</div>;
- const breadSelector = <div className="target-grid bread-selector" role="group" aria-label="届けるパン">{BREAD_TYPES.map(type=><button key={type} className={`target-button ${priv?.selection===type?'selected':''}`} aria-pressed={priv?.selection===type} disabled={busy||!!pending} onClick={()=>void send('select',{targetId:type})}>{breadNames[type]}<span>{priv?.selection===type?'選択中':'選ぶ'}</span></button>)}</div>;
- const confirmButton = <button className="primary" disabled={busy||!!pending||!!priv?.confirmed||((hunterShot||vote||thiefChoice||(night&&ability)||breadChoice)&&!priv?.selection)||(phase==='roles'&&!roleSeen)} onClick={()=> {
-   if(hunterShot||vote||thiefChoice||(night&&ability)||breadChoice)setDialog({text:hunterShot?`${name(priv?.selection)}さんを撃ちますか？ 確定すると取り消せません。`:priv?.selection==='__no_injection__'?'今夜は注射しないで確定しますか？':priv?.selection===NO_EXECUTION_ID?'「誰も処刑しない」への投票を確定しますか？ 確定後は変更できません。':breadChoice?`「${breadNames[priv?.selection as BreadType]}」を焼きますか？ 確定後は変更できません。`:thiefChoice?`${name(priv?.selection)}さんの役職を奪いますか？ 確定後は変更できません。`:`${name(priv?.selection)}さんで確定しますか？ 確定後は変更できません。`,action:'confirm'});
+ const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=>{const blocked=p.id===blockedGuardId;return <button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending||offline||blocked} onClick={()=>void send('select',{targetId:p.id,...(night&&role==='wolf'?{strength:wolfStrength}:{})})}>{name(p.id)}<span>{blocked?'前夜に護衛':priv?.selection===p.id?'選択中':'選ぶ'}</span></button>})}{night&&role==='doctor'&&<button className={`target-button ${priv?.selection==='__no_injection__'?'selected':''}`} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:'__no_injection__'})} aria-pressed={priv?.selection==='__no_injection__'}>注射しない<span>{priv?.selection==='__no_injection__'?'選択中':'選ぶ'}</span></button>}{canVoteNoExecution&&<button className={`target-button no-execution ${priv?.selection===NO_EXECUTION_ID?'selected':''}`} aria-pressed={priv?.selection===NO_EXECUTION_ID} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:NO_EXECUTION_ID})}>誰も処刑しない<span>{priv?.selection===NO_EXECUTION_ID?'選択中':'選ぶ'}</span></button>}</div>;
+ const breadSelector = <div className="target-grid bread-selector" role="group" aria-label="届けるパン">{BREAD_TYPES.map(type=><button key={type} className={`target-button ${priv?.selection===type?'selected':''}`} aria-pressed={priv?.selection===type} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:type})}>{breadNames[type]}<span>{priv?.selection===type?'選択中':'選ぶ'}</span></button>)}</div>;
+ const confirmButton = <button className="primary" disabled={busy||!!pending||offline||!!priv?.confirmed||((hunterShot||vote||thiefChoice||(night&&ability)||breadChoice)&&!choice)||(phase==='roles'&&!roleSeen)} onClick={()=> {
+   if(choice) setDialog({text:choice.question,action:'confirm'});
    else void send('confirm');
- }}>{priv?.confirmed?'確認済み・みんなを待っています':busy?'送信中…':hunterShot?'この人への発砲を確定':vote?'この人への投票を確定':breadChoice?'このパンを焼く':night&&ability?'この対象で確定':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了'}</button>;
+ }}>{busy?'送信中…':priv?.confirmed?'確定済み・みんなを待っています':choice?.button??(hunterShot?'この人への発砲を確定':vote?'この投票を確定':breadChoice?'このパンを焼く':night&&ability?'この対象で確定':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了')}</button>;
 
  return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
    <div className="game-top" key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1>{phaseNames[phase]}</h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
@@ -142,24 +148,25 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
    {!self.alive&&!hunterShot&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
    {phase==='finished'?<GameResult game={pub} room={room}>{game.personalNotice?.kind==='endurance'&&<p className="inline-note" role="status">あなただけへの通知：{game.personalNotice.day}日目の夜、筋肉で襲撃に耐えました。襲撃への耐久は使用済みです。</p>}{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じメンバーで再戦</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
-     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content"><RoleRevealCard role={priv.role} animate={flipping} onComplete={finishReveal}/><div hidden={flipping}><span className="role-team">{teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
+     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">{priv.confirmed&&<div hidden={flipping}>{selectionCard}</div>}<RoleRevealCard role={priv.role} animate={flipping} onComplete={finishReveal}/><div hidden={flipping}><span className="role-team">{teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
        {priv.loverId&&<div className="secret-box"><strong>あなたの恋人</strong><p>{name(priv.loverId)}さん</p></div>}
        {priv.thiefExchange?.targetId&&<div className="secret-box thief-result"><strong>怪盗の交換結果</strong><p><b>{name(priv.thiefExchange.targetId)}さん</b>の「{roleNames[priv.thiefExchange.stolenRole]}」を奪いました。</p><p>あなたの現在の役職は<strong>{roleNames[priv.thiefExchange.stolenRole]}</strong>です。</p></div>}
        {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p><small>仲間が誰を希望したかは表示されません。</small></div>}
        {role==='bodybuilder'&&priv.endurance&&<div className="secret-box" role="status"><strong>襲撃への耐久：{priv.endurance.used?'使用済み':'未使用（残り1回）'}</strong>{priv.endurance.used&&<p>{priv.endurance.day}日目の夜、筋肉で襲撃に耐えました。次の襲撃には耐えられません。</p>}</div>}
        {role==='doctor' &&<div className="secret-box"><strong>自分の注射履歴</strong><p>誰からでも、試合中に2回注射されると死亡します。他の医者の行動や対象の累計回数は分かりません。</p>{priv.injectionHistory?.map((h,i)=><p key={i}>{h.day}日目：{h.targetId==='__no_injection__'?'注射しない':`${name(h.targetId)}さんに注射`}</p>)}</div>}
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
-       {night&&canSelect&&ability&&<><p className="night-task">{priv.selection?'対象を選択しました。下の「この対象で確定」を押してください。':'対象を選んだあと、確定してください。'}</p><h3>{role==='wolf'?'襲撃する人':role==='seer'?'占う人':role==='doctor'?'注射する人':'護衛する人'}を選ぶ</h3>{role==='knight'&&pub.consecutiveGuard===false&&<p className="inline-note">連続護衛なしの設定です。前の夜に護衛した人は選べません。</p>}{role==='wolf'&&<div className="strength-picker" role="group" aria-label="襲撃の希望度">{([1,2,3] as const).map(value=><button type="button" className={wolfStrength===value?'selected':''} aria-pressed={wolfStrength===value} key={value} onClick={()=>{setWolfStrength(value);if(priv.selection)void send('select',{targetId:priv.selection,strength:value});}}>{value===1?'弱く希望':value===2?'希望':'強く希望'}（{value}）</button>)}</div>}{selector}</>}
+       {night&&canSelect&&ability&&<><p className="night-task">対象を選んだあと、内容を確認して確定してください。</p><h3>{role==='wolf'?'襲撃する人':role==='seer'?'占う人':role==='doctor'?'注射する人':'護衛する人'}を選ぶ</h3>{advice&&<p className="inline-note action-advice">{advice}</p>}{role==='wolf'&&<div className="strength-picker" role="group" aria-label="襲撃の希望度">{([1,2,3] as const).map(value=><button type="button" className={wolfStrength===value?'selected':''} aria-pressed={wolfStrength===value} disabled={busy||!!pending||offline} key={value} onClick={()=>{setWolfStrength(value);if(priv.selection)void send('select',{targetId:priv.selection,strength:value});}}>{value===1?'弱く希望':value===2?'希望':'強く希望'}（{value}）</button>)}</div>}{selector}</>}
        {breadChoice&&canSelect&&<><p className="night-task">{priv.selection?'パンを選びました。確定すると今夜のパンになります。':'今夜焼くパンを選んでください。'}</p><h3>届けるパンを選ぶ</h3>{breadSelector}</>}
-       {(night||breadChoice)&&confirmButton}
+       {thiefChoice&&canSelect&&<><h3>役職を奪う人を選ぶ</h3><p>交換はほかの人には知らされません。確定後は変更できません。</p>{selector}</>}
+       {(night||breadChoice||thiefChoice)&&<>{!priv.confirmed&&selectionCard}{confirmButton}</>}
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>
      </div></div>}</section>}
      <section className="panel phase-panel">{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
-       {phase==='hunter'&&<><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{canSelect&&selector}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
-       {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職を確認してから、確認完了を押してください。</p>{thiefChoice&&canSelect&&<><h3>役職を奪う人を選ぶ</h3><p>確定すると変更できません。交換はほかの人には知らされません。</p>{selector}</>}{self.alive&&confirmButton}</>}
+       {phase==='hunter'&&<><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{advice&&<p className="inline-note action-advice">{advice}</p>}{canSelect&&selector}{!priv?.confirmed&&selectionCard}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
+       {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職と必要な操作を確認し、完了してください。</p>{self.alive&&!thiefChoice&&confirmButton}</>}
        {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛・占いはありません。パン屋は最初に届けるパンを選び、怪盗は交換後の役職を「あなただけの情報」で確認できます。</p>{self.alive&&!breadChoice&&confirmButton}</>}
        {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><span aria-hidden="true">🥖</span><div><strong>{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}<p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
-       {vote&&<><h2>{phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{self.alive&&confirmButton}</>}
+       {vote&&<><h2>{priv?.confirmed?'投票を受け付けました':phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{!priv?.confirmed&&selectionCard}{priv?.confirmed&&<p className="complete-note">投票は確定済みです。内容は「あなただけの情報」で確認できます。</p>}{self.alive&&confirmButton}</>}
        {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
        {phase==='execution'&&<><h2>{pub.voteResult?.executedId?`${name(pub.voteResult.executedId)}さんが処刑されました`:noExecutionWon?'投票の結果、誰も処刑されませんでした':'同票のため、処刑はありません'}</h2><p>{pub.voteResult?.executedId?'処刑や狩人の発砲の経緯は、下の公開ログで確認できます。':'今夜へ進みます。'}</p></>}
        {phase==='morning'&&<><h2>朝になりました</h2>{pub.nightDeaths?.filter(d=>d.cause==='injection').map(d=><div className="attack-result-notice has-victim" key={d.playerId}><strong>{name(d.playerId)}さんは2回目の注射を受けたため死亡しました。</strong>{d.followedIds?.map(id=><p key={id}>{name(id)}さんは{name(d.playerId)}さんの恋人だったため後追いしました。</p>)}</div>)}{((pub.composition?.baker??0)>0 || pub.compositionMode==='random' && pub.randomCandidates?.includes('baker'))&&<div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status"><span aria-hidden="true">{pub.breadDelivered?'🥖':'…'}</span><div><strong>{pub.breadDelivered&&pub.breadDelivery?`${breadNames[pub.breadDelivery.breadType]}が届きました`:'今日はパンが届きませんでした'}</strong><p>{pub.compositionMode==='random'?(pub.breadDelivered?'パン屋の名前は公開されません。':'パンが届かなかった理由は公開されません。'):pub.breadDelivered?'パン屋は昨夜を生き延びました。誰なのかは公開されません。':'パン屋はすでに脱落しているか、昨夜の処理で脱落しました。'}</p></div></div>}<div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>襲撃による犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div><p>結果を確認したら、次の議論に進みましょう。</p></>}

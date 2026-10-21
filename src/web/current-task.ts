@@ -19,13 +19,13 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
   if (s.confirmed) return task('あなたの操作は完了しました', 'ほかの生存者が完了すると、自動で次へ進みます。', true);
   switch (s.phase) {
     case 'roles': return s.roleSeen
-      ? task('役職の確認を完了してください', '「役職を確認しました」を押してください。')
+      ? task('役職の確認を完了してください', '画面の案内に沿って、必要な操作と確認・確定を完了してください。')
       : task('自分の役職を確認してください', '「あなただけの情報」の「タップして表示」を押してください。');
     case 'firstNight': return task('初夜の確認を完了してください', '自分の情報を確認してから「夜の確認を完了」を押してください。');
     case 'discussion': return task('みんなで話し合いましょう', '時間になると自動で投票へ進みます。');
     case 'vote':
     case 'runoff': return s.selected
-      ? task('投票を確定してください', '選んだだけでは投票は完了しません。「この人への投票を確定」を押してください。')
+      ? task('投票を確定してください', '選んだだけでは投票は完了しません。「この投票を確定」を押してください。')
       : task(s.phase === 'runoff' ? '決選投票の相手を選んでください' : '投票する相手を選んでください', '相手を選んだあと、確定ボタンを押します。');
     case 'night': return task('夜の操作を完了してください', '「あなただけの情報」を開き、中の案内に沿って確認・確定してください。');
     case 'execution': return task('処刑の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に夜へ進みます。');

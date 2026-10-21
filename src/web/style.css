@@ -520,3 +520,12 @@ footer small { margin-left: auto; font-size: 12px; }
 .presentation-controls { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .result-presentation .presentation-controls button { margin-top:16px; padding:12px 8px; font-size:14px; }
 .result-presentation .presentation-skip { margin-top:12px; color:var(--muted); }
+
+.action-selection { margin:18px 0 14px; padding:18px; border:1px solid var(--gold); border-radius:12px; background:var(--surface-inset); overflow-wrap:anywhere; }
+.action-selection-status { display:block; color:var(--gold-bright); font-size:14px; font-weight:700; }
+.action-selection .action-selection-target { margin:10px 0; color:var(--ink); font-size:clamp(19px,4.5vw,25px); font-weight:700; line-height:1.65; }
+.action-selection .action-selection-extra { margin:8px 0; color:var(--gold-bright); font-weight:700; }
+.action-selection small { display:block; color:var(--muted); line-height:1.7; }
+.action-selection.is-confirmed { border-color:var(--village); background:var(--village-bg); }
+.action-selection.is-confirmed .action-selection-status { color:var(--village); }
+.action-advice { line-height:1.8; }
