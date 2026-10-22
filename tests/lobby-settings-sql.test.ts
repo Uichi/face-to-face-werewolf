@@ -1,3 +1,4 @@
+import { cleanLobbyComposition } from '../src/web/lobby-settings.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -18,6 +19,7 @@ test('参加・再参加・削除・退出で配役とルールを保持し、�
  const user=async(i:number)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[users[i]!]);await db.exec('set role authenticated');};
  const raw=async(fn:string,action:string,payload:object)=>(await db.query<{data:any}>(`select public.${fn}($1,$2::jsonb)data`,[action,JSON.stringify(payload)])).rows[0]!.data;
  await user(0);let response=await raw('lobby_command_bodybuilder','create',{nickname:'主催',requestId:randomUUID()});
+ assert.equal(cleanLobbyComposition(response.room.composition),null);
  for(let i=1;i<5;i++){await user(i);response=await raw('lobby_command_bodybuilder','join',{code:response.room.code,nickname:'参加'+i});}
  const roomId=response.room.id;
  try {

@@ -16,3 +16,14 @@ test('村人だけを増減し特殊役職を保持。不成立でも役職を�
  const small=resizeLobbyComposition(crowded,5,3);assert.equal(small.villager,0);assert.equal(small.doctor,1);
  assert.equal(resizeLobbyComposition(small,3,5).villager,0);assert.equal(resizeLobbyComposition(small,3,6).villager,1);
 });
+
+test('5人未満の旧SQL配列や余分な値を配役の合計に混ぜない',async()=>{
+ const {cleanLobbyComposition,lobbyCompositionTotal,initialLobbyComposition}=await import('../src/web/lobby-settings.ts');
+ const malformed=[{baker:0},{thief:0},null,{hunter:0}];assert.equal(cleanLobbyComposition(malformed),null);
+ const room=createSoloSession('villager',5).room;room.members=room.members.slice(0,1);room.composition=malformed as any;
+ const draft=initialLobbyComposition(room);assert.equal(lobbyCompositionTotal(draft),1);assert.equal(draft.wolf,0);
+ const comp=cleanLobbyComposition({...draft,wolf:1,metadata:{role:'wolf'},extra:null})!;
+ assert.equal(lobbyCompositionTotal(comp),2);assert.ok(!('metadata' in comp));
+ assert.equal(lobbyCompositionTotal({...comp,seer:NaN}),null);assert.equal(lobbyCompositionTotal({...comp,seer:'1' as any}),null);
+ assert.equal(lobbyCompositionTotal({...comp,seer:1}),3);
+});

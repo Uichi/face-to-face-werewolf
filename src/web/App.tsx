@@ -1,4 +1,4 @@
-import { lobbySettingsKey, resizeLobbyComposition } from './lobby-settings.ts';
+import { initialLobbyComposition, lobbyCompositionTotal, lobbySettingsKey, resizeLobbyComposition } from './lobby-settings.ts';
 import { RANDOM_ROLES } from '../domain/random-composition.ts';
 import type { CompositionMode } from '../domain/random-composition.ts';
 import { SETTINGS_KEY, parseFavorite, adaptFavorite, presetComposition } from './saved-settings.ts';
@@ -280,10 +280,11 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [randomMode, setRandomMode] = useState(room.compositionMode === 'random');
   const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)));
   const [custom, setCustom] = useState(room.customComposition);
-  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...(DEFAULT_COMPOSITIONS[room.members.length]??DEFAULT_COMPOSITIONS[5])! });
+  const [draft, setDraft] = useState<Composition>(()=>initialLobbyComposition(room));
   const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole));
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
+  const draftTotal=lobbyCompositionTotal(draft);
   const previousCount = useRef(count);
   const previousRoom = useRef(room.id);
   const settingsKey = lobbySettingsKey(room);
@@ -299,7 +300,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
   useEffect(() => {
     const changed=previousSettingsKey.current!==settingsKey || previousRoom.current!==room.id;
-    if(changed) { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole))); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...(DEFAULT_COMPOSITIONS[room.members.length]??DEFAULT_COMPOSITIONS[5])! }); }
+    if(changed) { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole))); setCustom(room.customComposition); setDraft(initialLobbyComposition(room)); }
     else if(previousCount.current!==count) {
       const before=previousCount.current;setDraft(value=>resizeLobbyComposition(value,before,count));
     }
@@ -363,8 +364,8 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
           </div></section>
           <section className="settings-section"><div className="settings-section-title"><span>02</span><h3>配役を決める</h3></div><div className="settings-section-body"><label>配役モード<select value={randomMode?'random':custom?'custom':'standard'} onChange={e=>{setRandomMode(e.target.value==='random');setCustom(e.target.value==='custom');}}><option value="standard">標準</option><option value="custom">カスタム</option>{room.randomComposition&&<option value="random">ランダム</option>}</select></label>
           {randomMode&&<fieldset><legend>抽選候補</legend><p className="small-note">人狼は{DEFAULT_COMPOSITIONS[count]?.wolf??'—'}人固定。村人を1人以上残し、候補から人数も抽選します。候補なしなら人狼と村人だけです。人数は終了まで秘密です。</p>{RANDOM_ROLES.filter(role=>availableRoles.includes(role)).map(role=><label className="check-label" key={role}><input type="checkbox" checked={candidates.includes(role)} onChange={e=>setCandidates(e.target.checked?[...candidates,role]:candidates.filter(item=>item!==role))}/>{roleNames[role]}{role==='lover'?'（2人セット）':''}</label>)}</fieldset>}
-          {custom && !randomMode && <div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}{role === 'lover' ? <select aria-label="恋人の人数" value={draft.lover} onChange={e => setDraft({ ...draft, lover: Number(e.target.value) })}><option value={0}>0人</option><option value={2}>2人</option></select> : <input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : role==='doctor'?2:1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/>}</label>)}</div>}
-          <div className="composition-meter"><strong>{randomMode?'配役人数は終了まで秘密':`${custom?Object.values(draft).reduce((total,n)=>total+n,0):count} / ${count}人`}</strong><p>標準は人数に合わせて配役を更新。カスタムは人狼・特殊役職を維持し、村人数を調整します。人数が足りない場合は役職を減らしてください。</p></div></div></section>
+          {custom && !randomMode && <div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}{role === 'lover' ? <select aria-label="恋人の人数" value={draft.lover} onChange={e => setDraft({ ...draft, lover: Number(e.target.value) })}><option value={0}>0人</option><option value={2}>2人</option></select> : <input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : role==='doctor'?2:1} step={1} value={Number.isNaN(draft[role])?'':draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/>}</label>)}</div>}
+          <div className="composition-meter"><strong>{randomMode?'配役人数は終了まで秘密':custom&&draftTotal===null?'役職の人数を入力してください':`配役合計 ${custom?draftTotal:count}人 / 参加者 ${count}人`}</strong><p>標準は人数に合わせて配役を更新。カスタムは人狼・特殊役職を維持し、村人数を調整します。人数が足りない場合は役職を減らしてください。</p></div></div></section>
           {room.victoryPoints && <details className="settings-section"><summary>03　役職別の勝利点</summary><div className="settings-section-body"><fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset></div></details>}
           {pointsError && <p className="field-error" role="alert">{pointsError}</p>}
           {settingError && <p className="field-error" role="alert">{settingError}</p>}

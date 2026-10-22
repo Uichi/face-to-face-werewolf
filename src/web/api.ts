@@ -1,3 +1,4 @@
+import { cleanLobbyComposition } from './lobby-settings.ts';
 import { createClient } from '@supabase/supabase-js';
 import type { Room } from './types.ts';
 
@@ -54,7 +55,7 @@ export class RoomAccessLostError extends Error {}
 function normalizeRoom(room: Room): Room {
   const bakerRole = room.victoryPoints?.baker !== undefined;
   const thiefRole = room.victoryPoints?.thief !== undefined;
-  return { ...room, bakerRole, thiefRole, hunterRole: room.victoryPoints?.hunter !== undefined, doctorRole: room.doctorRole===true, bodybuilderRole: room.bodybuilderRole===true, composition: room.composition ? { ...room.composition, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0 } : room.composition };
+  return { ...room, bakerRole, thiefRole, hunterRole: room.victoryPoints?.hunter !== undefined, doctorRole: room.doctorRole===true, bodybuilderRole: room.bodybuilderRole===true, composition: cleanLobbyComposition(room.composition) };
 }
 export async function membership(action: 'remove' | 'leave', payload: Record<string, unknown>): Promise<{ room?: Room; left?: boolean }> {
   if (!client) throw new Error('接続先が設定されていません。');
