@@ -529,3 +529,25 @@ footer small { margin-left: auto; font-size: 12px; }
 .action-selection.is-confirmed { border-color:var(--village); background:var(--village-bg); }
 .action-selection.is-confirmed .action-selection-status { color:var(--village); }
 .action-advice { line-height:1.8; }
+
+.settings-editor-heading { padding:20px; border:1px solid var(--line-gold); border-radius:14px; background:linear-gradient(135deg,#24362a,var(--surface-inset)); }
+.settings-editor-heading h3 { margin:10px 0; font-size:23px; font-family:'Noto Serif JP',serif; color:var(--gold-bright); }
+.settings-editor-heading p,.settings-save-bar p,.composition-meter p { color:var(--muted); line-height:1.8; font-size:13px; }
+.settings-roster-pill { display:inline-block; border:1px solid var(--line-gold); border-radius:30px; padding:6px 12px; font-size:12px; color:var(--gold-bright); }
+.settings-section { border:1px solid var(--line); border-radius:14px; background:var(--surface-inset); min-width:0; overflow:hidden; }
+.settings-section>summary { padding:18px; font-weight:700; color:var(--gold-bright); min-height:56px; cursor:pointer; }
+.settings-section-title { display:flex; gap:12px; align-items:center; padding:18px; border-bottom:1px solid var(--line); }
+.settings-section-title span { color:var(--gold); font-size:13px; }
+.settings-section-title h3 { margin:0; font-size:18px; }
+.settings-section-body { padding:18px; display:grid; gap:18px; }
+.settings-section-body fieldset { min-width:0; margin:0; }
+.settings-section-body .role-inputs label { padding:12px; background:var(--surface); border:1px solid var(--line); border-radius:10px; gap:10px; }
+.settings-section-body .check-label { padding:12px; background:var(--surface); border-radius:10px; }
+.composition-meter { border-top:1px solid var(--line); padding-top:16px; }
+.composition-meter strong { font-size:18px; color:var(--gold-bright); }
+.settings-save-bar { padding:16px; background:var(--surface-raised); border:1px solid var(--line-gold); border-radius:12px; }
+.settings-save-bar .primary { width:100%; }
+.preview-roster-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; flex-basis:100%; }
+.preview-roster-controls>span { flex-basis:100%; }
+.preview-banner .preview-roster-controls button { margin-left:0; border:1px solid var(--line-gold); border-radius:8px; padding:8px 12px; text-decoration:none; }
+.preview-banner { flex-wrap:wrap; }

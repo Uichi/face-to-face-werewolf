@@ -1,3 +1,4 @@
+import { lobbySettingsKey, resizeLobbyComposition } from './lobby-settings.ts';
 import { RANDOM_ROLES } from '../domain/random-composition.ts';
 import type { CompositionMode } from '../domain/random-composition.ts';
 import { SETTINGS_KEY, parseFavorite, adaptFavorite, presetComposition } from './saved-settings.ts';
@@ -153,7 +154,7 @@ export default function App() {
   }
   function home() { setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); setSoloTest(false); history.replaceState(null, '', location.pathname); }
   async function updateSettings(composition: Composition | null, discussionMinutes: number, victoryPoints?: VictoryPoints, consecutiveGuard = true, wolfboundEnabled = false, compositionMode: CompositionMode = composition ? 'custom' : 'standard', randomCandidates: Role[] = RANDOM_ROLES) {
-    if (!room || operation.current) return;
+    if (!room || operation.current) return false;
     operation.current = true; setBusy(true); setError(''); setNotice('');
     try {
       if (preview) setRoom({ ...room, compositionMode, randomCandidates, fixedWolves: DEFAULT_COMPOSITIONS[room.members.length]?.wolf, composition: compositionMode==='random' ? null : composition ?? { ...DEFAULT_COMPOSITIONS[room.members.length]! }, customComposition: composition !== null, discussionMinutes, victoryPoints, consecutiveGuard, wolfboundEnabled, revision: room.revision + 1 });
@@ -165,8 +166,8 @@ export default function App() {
         const updated = await lobby('settings', { roomId: room.id, revision: room.revision, composition: compPayload, discussionMinutes, ...(room.randomComposition ? {compositionMode, randomCandidates} : {}), ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
         setRoom(current => current?.id === updated.id && current.revision <= updated.revision ? updated : current);
       }
-      setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。');
-    } catch (e) { setError((e as Error).message); }
+      setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。'); return true;
+    } catch (e) { setError((e as Error).message); return false; }
     finally { setBusy(false); operation.current = false; }
   }
 
@@ -229,7 +230,7 @@ export default function App() {
   return <div className="app">
     <header className="site-header"><button className="brand" onClick={home} aria-label="夜のよりあい トップへ"><Moon small/><span>夜のよりあい</span></button><span className="header-note">集まって、話して、見抜こう。</span><span className="edition">対面人狼</span><button className="rules-trigger" aria-haspopup="dialog" onClick={() => setRulesOpen(true)}>役職・ルール</button></header>
     <main>
-      {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button></div>}
+      {preview && <div className="preview-banner">画面プレビュー <span>参加者は見本です。実際の部屋は作成されません。</span><button onClick={home}>終了</button><div className="preview-roster-controls"><span>人数変化の確認</span><button disabled={room!.members.length>=13} onClick={()=>setRoom(current=>{if(!current||current.members.length>=13)return current;const count=current.members.length+1;return {...current,revision:current.revision+1,composition:current.customComposition&&current.composition?resizeLobbyComposition(current.composition,count-1,count):current.compositionMode==='random'?null:DEFAULT_COMPOSITIONS[count]??null,members:[...current.members,{id:`preview-${Date.now()}`,nickname:`見本${count}`,connected:true}]};})}>見本を1人追加</button><button disabled={room!.members.length<=1} onClick={()=>setRoom(current=>{if(!current||current.members.length<=1)return current;const count=current.members.length-1;return {...current,revision:current.revision+1,composition:current.customComposition&&current.composition?resizeLobbyComposition(current.composition,count+1,count):current.compositionMode==='random'?null:DEFAULT_COMPOSITIONS[count]??null,members:current.members.slice(0,-1)};})}>見本を1人減らす</button></div></div>}
       {error && <div className="message error" role="alert">{error}</div>}
       {notice && <div className="message" role="status">{notice}</div>}
       {soloTest ? <SoloTest onExit={home}/> : room ? room.status === 'waiting' ? <Lobby room={room} preview={preview} busy={busy} syncing={syncing} onResetPoints={clearPoints} onSave={updateSettings} onNotice={setNotice} onStart={startGame} onMember={manageMember} /> : <GameScreen key={room.id} helpOpen={rulesOpen} room={room} onRoom={receiveRoom} onHome={home}/> : <>
@@ -267,7 +268,7 @@ export default function App() {
 function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMember, onResetPoints }: {
   room: Room; preview: boolean; busy: boolean; syncing: boolean; onStart: () => Promise<void>; onMember: (action: 'remove' | 'leave', targetId?: string) => Promise<void>;
   onResetPoints: () => Promise<void>;
-  onSave: (composition: Composition | null, minutes: number, victoryPoints?: VictoryPoints, consecutiveGuard?: boolean, wolfboundEnabled?: boolean, compositionMode?: CompositionMode, randomCandidates?: Role[]) => Promise<void>; onNotice: (message: string) => void;
+  onSave: (composition: Composition | null, minutes: number, victoryPoints?: VictoryPoints, consecutiveGuard?: boolean, wolfboundEnabled?: boolean, compositionMode?: CompositionMode, randomCandidates?: Role[]) => Promise<boolean>; onNotice: (message: string) => void;
 }) {
   const [pointsDraft, setPointsDraft] = useState<VictoryPoints>({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints });
   const [favorite, setFavorite] = useState<FavoriteSettings | null>(() => { try { return parseFavorite(localStorage.getItem(SETTINGS_KEY)); } catch { return null; } });
@@ -279,10 +280,14 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [randomMode, setRandomMode] = useState(room.compositionMode === 'random');
   const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)));
   const [custom, setCustom] = useState(room.customComposition);
-  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! });
+  const [draft, setDraft] = useState<Composition>(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...(DEFAULT_COMPOSITIONS[room.members.length]??DEFAULT_COMPOSITIONS[5])! });
   const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole));
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
+  const previousCount = useRef(count);
+  const previousRoom = useRef(room.id);
+  const settingsKey = lobbySettingsKey(room);
+  const previousSettingsKey = useRef(settingsKey);
   const invite = invitationUrl(location.origin, location.pathname, room.code, preview, import.meta.env.VITE_INVITE_BASE_URL);
   const host = room.members.find(m => m.id === room.hostId);
   let settingError = '';
@@ -290,9 +295,16 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   let pointsError = '';
   try { if (room.victoryPoints) validateVictoryPoints(pointsDraft); } catch (e) { pointsError = (e as Error).message; }
   let currentError = '';
-  try { if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 }); } catch (e) { currentError = (e as Error).message; }
+  try { if (room.wolfboundEnabled && room.compositionMode!=='random' && (room.composition?.villager??0)<1 && count>=5) throw new Error('狼憑き用の村人が必要です'); if (room.composition) validateComposition(count, { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 }); } catch (e) { currentError = (e as Error).message; }
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
-  useEffect(() => { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole))); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...DEFAULT_COMPOSITIONS[5]! }); }, [room.revision, room.hostId]);
+  useEffect(() => {
+    const changed=previousSettingsKey.current!==settingsKey || previousRoom.current!==room.id;
+    if(changed) { setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole))); setCustom(room.customComposition); setDraft(room.composition ? { ...room.composition, madman: room.composition.madman ?? 0, lover: room.composition.lover ?? 0, baker: room.composition.baker ?? 0, thief: room.composition.thief ?? 0, hunter: room.composition.hunter ?? 0, doctor: room.composition.doctor ?? 0, bodybuilder: room.composition.bodybuilder ?? 0 } : { ...(DEFAULT_COMPOSITIONS[room.members.length]??DEFAULT_COMPOSITIONS[5])! }); }
+    else if(previousCount.current!==count) {
+      const before=previousCount.current;setDraft(value=>resizeLobbyComposition(value,before,count));
+    }
+    previousSettingsKey.current=settingsKey;previousRoom.current=room.id;previousCount.current=count;
+  },[settingsKey,count,room.id]);
   function choosePreset(preset: Preset) {
     try { setDraft(presetComposition(count, preset, availableRoles)); setCustom(preset !== 'standard'); setRandomMode(false); setWolfboundEnabled(false); }
     catch (error) { onNotice((error as Error).message); }
@@ -331,7 +343,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span>{isHost && !preview && member.id !== room.viewerId && <button className="member-remove" disabled={busy} aria-label={`${member.nickname}さんを待機室から削除`} onClick={() => void onMember('remove', member.id)}>削除</button>}</div>)}
         {count < 5 && <div className="empty-seat"><span>＋</span>あと{5 - count}人で、始められる人数になります。</div>}
       </div></section>
-      <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '閉じる' : '設定を変更'}</button>}</div>
+      <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '編集を閉じる'  : '設定を変更'}</button>}</div>
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
         {room.consecutiveGuard !== undefined && <div className="setting-line"><span>騎士の連続護衛</span><strong>{room.consecutiveGuard ? 'あり' : 'なし'}</strong></div>}
         {room.wolfboundEnabled !== undefined && <div className="setting-line"><span>狼憑き</span><strong>{room.wolfboundEnabled ? '50%で0〜1人' : '使用しない'}</strong></div>}
@@ -339,20 +351,24 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         {room.loverRole && (room.composition?.lover ?? 0) > 0 && <p className="inline-note">恋人は村側の2人組です。片方が脱落すると、もう片方も後追いで脱落します。</p>}
         {!room.composition && room.compositionMode!=='random' && <p className="small-note">5人集まると、おすすめの配役が表示されます。</p>}
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}
-        {currentError && <p role="alert" className="field-error">参加人数が変わりました。配役を設定し直してください。</p>}
-        {editing && isHost && <form className="settings-form" onSubmit={e => { e.preventDefault(); void onSave(!randomMode && custom ? draft : null, minutes, room.victoryPoints ? pointsDraft : undefined, consecutiveGuard, wolfboundEnabled, randomMode?'random':custom?'custom':'standard', candidates); }}>
-          <fieldset className="preset-settings"><legend>配役プリセット</legend><p className="small-note">現在の人数に合わせます。時間・配点はそのままです。狼憑きは使用しない設定になります。</p><div className="preset-buttons"><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('standard')}>標準</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('basic')}>基本役職のみ</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('special')}>特殊役職あり</button></div><p className="small-note">基本役職のみ：狂人を村人に変更。特殊役職あり：村人を1人以上残し、パン屋・狩人・怪盗を順に追加します。試遊用の配役です。</p></fieldset>
+        {currentError && <p role="alert" className="field-error">現在の人数では配役が成立しません。特殊役職を減らすか、参加者を追加してください。</p>}
+        {editing && isHost && <form className="settings-form" onSubmit={async e => { e.preventDefault(); const saved=await onSave(!randomMode && custom ? draft : null, minutes, room.victoryPoints ? pointsDraft : undefined, consecutiveGuard, wolfboundEnabled, randomMode?'random':custom?'custom':'standard', candidates); if(saved)setEditing(false); }}>
+          <div className="settings-editor-heading"><span className="section-number">GAME SETTINGS</span><h3>今夜の遊び方を整える</h3><p>編集中の設定は参加者が増えても維持します。変更後は、下のボタンで部屋に反映してください。</p><span className="settings-roster-pill">現在 {count}人 · 村人数で自動調整</span></div>
+          <details className="settings-section"><summary>プリセット・お気に入り</summary><div className="settings-section-body"><fieldset className="preset-settings"><legend>配役プリセット</legend><p className="small-note">現在の人数に合わせます。時間・配点はそのままです。狼憑きは使用しない設定になります。</p><div className="preset-buttons"><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('standard')}>標準</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('basic')}>基本役職のみ</button><button type="button" disabled={busy || count < 5} onClick={() => choosePreset('special')}>特殊役職あり</button></div><p className="small-note">基本役職のみ：狂人を村人に変更。特殊役職あり：村人を1人以上残し、パン屋・狩人・怪盗を順に追加します。試遊用の配役です。</p></fieldset>
           <fieldset className="preset-settings"><legend>お気に入り設定</legend><p className="small-note">同じ端末・ブラウザに1件保存できます。配役モード・抽選候補・議論時間・勝利点・連続護衛・狼憑きを保存します。カスタム配役は人数が違う場合に村人数を調整します。</p><div className="preset-buttons"><button type="button" disabled={busy || !!settingError || !!pointsError || count < 5} onClick={saveFavorite}>今の設定を保存</button><button type="button" disabled={busy || !favorite || count < 5} onClick={loadFavorite}>保存した設定を呼び出す</button>{favorite && <button type="button" disabled={busy} onClick={deleteFavorite}>保存を削除</button>}</div>{favorite && <p className="small-note">保存済み：{favorite.count}人・議論{favorite.minutes}分。保存情報を消すと失われます。</p>}</fieldset>
-          <label>議論時間<select value={minutes} onChange={e => setMinutes(Number(e.target.value))}>{Array.from({ length: 10 }, (_, i) => <option value={i + 1} key={i}>{i + 1}分</option>)}</select></label>
+          </div></details>
+          <section className="settings-section"><div className="settings-section-title"><span>01</span><h3>基本ルール</h3></div><div className="settings-section-body"><label>議論時間<select value={minutes} onChange={e => setMinutes(Number(e.target.value))}>{Array.from({ length: 10 }, (_, i) => <option value={i + 1} key={i}>{i + 1}分</option>)}</select></label>
           {room.consecutiveGuard !== undefined && <label className="check-label"><input type="checkbox" checked={consecutiveGuard} onChange={e => setConsecutiveGuard(e.target.checked)}/>騎士が同じ人を連続して護衛できる</label>}
           {room.wolfboundEnabled !== undefined && <label className="check-label"><input type="checkbox" checked={wolfboundEnabled} onChange={e => setWolfboundEnabled(e.target.checked)}/>狼憑きを使用する（50%で村人の中から0〜1人）</label>}
-          <label>配役モード<select value={randomMode?'random':custom?'custom':'standard'} onChange={e=>{setRandomMode(e.target.value==='random');setCustom(e.target.value==='custom');}}><option value="standard">標準</option><option value="custom">カスタム</option>{room.randomComposition&&<option value="random">ランダム</option>}</select></label>
+          </div></section>
+          <section className="settings-section"><div className="settings-section-title"><span>02</span><h3>配役を決める</h3></div><div className="settings-section-body"><label>配役モード<select value={randomMode?'random':custom?'custom':'standard'} onChange={e=>{setRandomMode(e.target.value==='random');setCustom(e.target.value==='custom');}}><option value="standard">標準</option><option value="custom">カスタム</option>{room.randomComposition&&<option value="random">ランダム</option>}</select></label>
           {randomMode&&<fieldset><legend>抽選候補</legend><p className="small-note">人狼は{DEFAULT_COMPOSITIONS[count]?.wolf??'—'}人固定。村人を1人以上残し、候補から人数も抽選します。候補なしなら人狼と村人だけです。人数は終了まで秘密です。</p>{RANDOM_ROLES.filter(role=>availableRoles.includes(role)).map(role=><label className="check-label" key={role}><input type="checkbox" checked={candidates.includes(role)} onChange={e=>setCandidates(e.target.checked?[...candidates,role]:candidates.filter(item=>item!==role))}/>{roleNames[role]}{role==='lover'?'（2人セット）':''}</label>)}</fieldset>}
           {custom && !randomMode && <div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}{role === 'lover' ? <select aria-label="恋人の人数" value={draft.lover} onChange={e => setDraft({ ...draft, lover: Number(e.target.value) })}><option value={0}>0人</option><option value={2}>2人</option></select> : <input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : role==='doctor'?2:1} step={1} value={draft[role]} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/>}</label>)}</div>}
-          {room.victoryPoints && <fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset>}
+          <div className="composition-meter"><strong>{randomMode?'配役人数は終了まで秘密':`${custom?Object.values(draft).reduce((total,n)=>total+n,0):count} / ${count}人`}</strong><p>標準は人数に合わせて配役を更新。カスタムは人狼・特殊役職を維持し、村人数を調整します。人数が足りない場合は役職を減らしてください。</p></div></div></section>
+          {room.victoryPoints && <details className="settings-section"><summary>03　役職別の勝利点</summary><div className="settings-section-body"><fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset></div></details>}
           {pointsError && <p className="field-error" role="alert">{pointsError}</p>}
           {settingError && <p className="field-error" role="alert">{settingError}</p>}
-          <button className="primary" disabled={busy || Boolean(settingError) || Boolean(pointsError)}>この設定を部屋に反映</button>
+          <div className="settings-save-bar"><p>参加者の増減では時間・配点・ルールを変更しません。</p><button className="primary" disabled={busy || syncing || count<5 || Boolean(settingError) || Boolean(pointsError)}>{busy?'設定を反映しています…':'この設定を部屋に反映'}</button></div>
         </form>}
         <div className="rule-footnote">初夜の襲撃なし <span>·</span> 役職は本人だけに表示</div>
       </section>
@@ -362,7 +378,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       <span className="code-label">{preview ? '部屋コードの見本' : '部屋コード'}</span><div className="room-code">{room.code.slice(0, 5)}<span> </span>{room.code.slice(5)}</div>
       {!preview && new URL(invite).protocol === 'http:' && <p className="inline-note">接続テスト中です。スマホをこのパソコンと同じWi-Fiにつないでから読み取ってください。</p>}
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
-      <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled={preview || busy || !isHost || count < 5 || (!room.composition && room.compositionMode!=='random') || Boolean(currentError)} onClick={() => void onStart()}>{busy ? '準備しています…' : isHost ? 'ゲームを開始する' : '主催者の開始を待っています'}</button><small>{preview ? 'プレビューではゲームを開始できません。' : '全員そろったら開始しましょう。開始後の新規参加はできません。'}</small></div>
+      <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled={preview || busy || editing || !isHost || count < 5 || (!room.composition && room.compositionMode!=='random') || Boolean(currentError)} onClick={() => void onStart()}>{busy ? '準備しています…' : isHost ? 'ゲームを開始する' : '主催者の開始を待っています'}</button><small>{preview ? 'プレビューではゲームを開始できません。' : editing ? '設定を部屋に反映するか、編集を閉じてから開始してください。' : '全員そろったら開始しましょう。開始後の新規参加はできません。'}</small></div>
     </aside></div>
     {!preview && <div className="leave-area"><button className="secondary-button" disabled={busy} onClick={() => void onMember('leave')}>部屋から退出する</button><p>退出すると参加者一覧から名前が消えます。招待コードで再参加できます。</p></div>}
     <div className="lobby-bottom"><span>◌</span><p>画面を閉じても、同じブラウザから席に戻れます。<br/><small>接続が切れても、すぐに脱落することはありません。</small></p></div>
