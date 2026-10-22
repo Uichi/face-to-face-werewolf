@@ -552,3 +552,37 @@ footer small { margin-left: auto; font-size: 12px; }
 .preview-banner .preview-roster-controls button { margin-left:0; border:1px solid var(--line-gold); border-radius:8px; padding:8px 12px; text-decoration:none; }
 .preview-banner { flex-wrap:wrap; }
 .planned-roster { margin:0 0 18px; padding:12px 14px; border:1px solid var(--line-gold); border-radius:10px; background:var(--surface-inset); color:var(--gold-bright); font-size:14px; line-height:1.8; overflow-wrap:anywhere; }
+
+.postgame-hub { border:1px solid var(--line-gold); border-radius:16px; padding:24px; background:var(--surface-inset); }
+.postgame-hub>h3 { margin:12px 0 20px; font-family:'Noto Serif JP',serif; color:var(--gold-bright); font-size:26px; }
+.your-score-review { border:1px solid var(--line); border-radius:12px; padding:18px; background:var(--surface); }
+.your-score-review>div:first-child { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.your-score-review strong { color:var(--gold-bright); font-size:36px; }
+.your-score-review strong small { margin-left:5px; font-size:16px; }
+.your-score-parts { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:14px; }
+.review-leaders { padding:18px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.review-leaders>span { font-size:13px; color:var(--gold-bright); }
+.review-leaders p { margin:8px 0; font-weight:700; }
+.review-leaders small,.review-next-game>p { color:var(--muted); font-size:13px; line-height:1.8; }
+.review-next-game>h4 { margin:20px 0 8px; font-size:18px; }
+.review-next-game>.primary { width:100%; margin:14px 0; }
+.review-next-game .result-exit { margin:18px 0 0; }
+.review-navigation { display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid var(--line); padding-top:18px; margin-top:20px; }
+.review-navigation a { padding:11px 14px; min-height:44px; border:1px solid var(--line-gold); border-radius:8px; color:var(--gold-bright); text-decoration:none; font-size:13px; }
+#match-review-timeline,#match-review-scores,#match-review-roles { scroll-margin-top:24px; }
+.review-caption,.review-empty { color:var(--muted); font-size:13px; line-height:1.9; }
+.result-panel .review-empty { margin:24px 28px; }
+.review-timeline { margin:24px 28px; padding:20px; }
+.review-day { margin-top:20px; border:1px solid var(--line); border-radius:12px; padding:16px; background:var(--surface-inset); }
+.review-day>h3 { margin:0 0 12px; font-family:'Noto Serif JP',serif; font-size:21px; color:var(--gold-bright); }
+.review-day ol { margin:0; }
+.review-day li:last-child { border-bottom:0; }
+.review-removals { margin:24px 28px; padding:18px; border:1px solid var(--line); border-radius:12px; }
+.review-scores .scoreboard { margin:0; }
+.score-explanation { padding:12px 14px; margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface-inset); }
+.score-explanation summary { color:var(--gold-bright); min-height:32px; cursor:pointer; line-height:1.8; }
+.score-explanation dt { font-weight:700; margin:14px 0 6px; color:var(--ink); }
+.score-explanation dd { margin:0; color:var(--muted); font-size:13px; line-height:1.9; }
+.score-explanation h4 { font-size:14px; margin:18px 0 8px; }
+.score-explanation ul { padding-left:20px; font-size:13px; line-height:1.9; color:var(--muted); }
+@media(max-width:700px) { .postgame-hub { padding:18px; } .review-timeline,.review-removals { margin:24px 18px; padding:16px; } .review-day { padding:12px; } .postgame-hub>h3 { font-size:23px; } .review-navigation a { flex:1 1 110px; text-align:center; } }

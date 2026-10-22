@@ -64,7 +64,9 @@ export function createRobbedScenario(role: Exclude<Role, 'thief'>, count = 10): 
 }
 
 export function soloResponse(session: SoloSession): GameResponse {
-  const room = { ...session.room, status: session.game.phase === 'finished' ? 'finished' as const : 'playing' as const };
+  // Derive the preview total without mutating its base, so refreshes cannot add twice.
+  const room = { ...session.room, status: session.game.phase === 'finished' ? 'finished' as const : 'playing' as const,
+    members: session.room.members.map(member => ({ ...member, points: (member.points ?? 0) + (session.game.phase === 'finished' ? session.game.scores?.find(score => score.playerId === member.id)?.total ?? 0 : 0) })) };
   return { ok: true, room, game: viewFor(session.game, SOLO_VIEWER), serverNow: session.now };
 }
 
