@@ -551,3 +551,4 @@ footer small { margin-left: auto; font-size: 12px; }
 .preview-roster-controls>span { flex-basis:100%; }
 .preview-banner .preview-roster-controls button { margin-left:0; border:1px solid var(--line-gold); border-radius:8px; padding:8px 12px; text-decoration:none; }
 .preview-banner { flex-wrap:wrap; }
+.planned-roster { margin:0 0 18px; padding:12px 14px; border:1px solid var(--line-gold); border-radius:10px; background:var(--surface-inset); color:var(--gold-bright); font-size:14px; line-height:1.8; overflow-wrap:anywhere; }

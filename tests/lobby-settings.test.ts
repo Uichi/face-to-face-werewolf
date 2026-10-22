@@ -27,3 +27,12 @@ test('5人未満の旧SQL配列や余分な値を配役の合計に混ぜない'
  assert.equal(lobbyCompositionTotal({...comp,seer:NaN}),null);assert.equal(lobbyCompositionTotal({...comp,seer:'1' as any}),null);
  assert.equal(lobbyCompositionTotal({...comp,seer:1}),3);
 });
+
+test('予定人数を基準に標準配役を用意し、参加人数と残り人数を明示する',async()=>{
+ const {initialLobbyComposition,plannedRosterMessage}=await import('../src/web/lobby-settings.ts');
+ const room=createSoloSession('villager',5).room;room.members=room.members.slice(0,1);room.composition=null;room.plannedPlayers=10;
+ const comp=initialLobbyComposition(room);assert.equal(comp.wolf,2);assert.equal(comp.villager,4);
+ assert.match(plannedRosterMessage(10,1),/あと9人/);assert.match(plannedRosterMessage(10,10),/全員そろいました/);assert.match(plannedRosterMessage(10,11),/1人多く/);
+ const key=lobbySettingsKey(room);assert.equal(lobbySettingsKey({...room,members:[...room.members,{id:'new',nickname:'新規',connected:true}]}),key);
+ assert.notEqual(lobbySettingsKey({...room,plannedPlayers:11}),key);
+});

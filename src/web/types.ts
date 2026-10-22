@@ -3,6 +3,7 @@ import type { Composition } from '../domain/rules.ts';
 export type Member = { id: string; nickname: string; connected: boolean; points?: number };
 export type Room = {
   id: string; code: string; hostId: string; viewerId: string; status: 'waiting' | 'playing' | 'finished';
+  plannedPlayers?: number | null;
   revision: number; discussionMinutes: number; composition: Composition | null;
   randomComposition?: boolean; compositionMode?: 'standard' | 'custom' | 'random'; randomCandidates?: import('../domain/rules.ts').Role[]; fixedWolves?: number;
   loverRole?: boolean;
