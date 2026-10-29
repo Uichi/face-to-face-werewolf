@@ -586,3 +586,11 @@ footer small { margin-left: auto; font-size: 12px; }
 .score-explanation h4 { font-size:14px; margin:18px 0 8px; }
 .score-explanation ul { padding-left:20px; font-size:13px; line-height:1.9; color:var(--muted); }
 @media(max-width:700px) { .postgame-hub { padding:18px; } .review-timeline,.review-removals { margin:24px 18px; padding:16px; } .review-day { padding:12px; } .postgame-hub>h3 { font-size:23px; } .review-navigation a { flex:1 1 110px; text-align:center; } }
+
+/* Bread artwork uses the existing delivery state; it never implies a delivery. */
+.bread-image { display:block; width:clamp(100px,24vw,180px); height:160px; object-fit:contain; flex-shrink:0; margin:0 auto; }
+.bread-image.compact { width:72px; height:72px; margin:0 auto 8px; }
+.bread-selector .target-button:has(.bread-image) { display:flex; flex-direction:column; align-items:center; }
+.bread-notice:has(.bread-image) { flex-wrap:wrap; align-items:center; }
+.bread-notice:has(.bread-image) > div { flex:1 1 180px; }
+.public-log .bread-image.compact { display:inline-block; width:64px; height:64px; vertical-align:middle; margin:0 10px 0 0; }

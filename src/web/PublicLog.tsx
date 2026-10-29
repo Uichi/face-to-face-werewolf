@@ -1,3 +1,4 @@
+import BreadImage from './BreadImage.tsx';
 import { reviewDays } from './match-review.ts';
 import type { BreadType, PublicLogEvent } from '../domain/game.ts';
 import type { Room } from './types.ts';
@@ -15,7 +16,7 @@ export default function PublicLog({ events, room, grouped = false, finalVote }: 
       {event.kind === 'hunterReady' && <p><strong>{name(event.playerId)}さん</strong>は狩人だったため、最後の発砲を行います。</p>}
       {event.kind === 'shot' && <p><strong>{name(event.playerId)}さん</strong>は、狩人の<strong>{name(event.actorId)}さん</strong>の発砲で脱落しました。</p>}
       {event.kind === 'shotCancelled' && <p><strong>狩人の発砲を中止しました。</strong>{event.reason}</p>}
-      {event.kind === 'bread' && event.breadType && <p><strong>{({shokupan:'食パン',croissant:'クロワッサン',melonpan:'メロンパン',currypan:'カレーパン',anpan:'あんパン',surprise:'おまかせ'} satisfies Record<BreadType,string>)[event.breadType]}</strong>が届きました。</p>}
+      {event.kind === 'bread' && event.breadType && <p><BreadImage type={event.breadType} compact/><strong>{({shokupan:'食パン',croissant:'クロワッサン',melonpan:'メロンパン',currypan:'カレーパン',anpan:'あんパン',surprise:'おまかせ'} satisfies Record<BreadType,string>)[event.breadType]}</strong>が届きました。</p>}
       {(event.kind==='attack'||event.kind==='injection'?events.filter(e=>e.day===event.day&&(e.kind==='attack'||e.kind==='injection')).at(-1)?.id===event.id?events.filter(e=>e.day===event.day&&(e.kind==='attack'||e.kind==='injection')).flatMap(e=>(e.followedIds??[]).map(id=>({id,source:e.playerId}))):[]:(event.followedIds??[]).map(id=>({id,source:event.playerId}))).map(({id,source}) => <p className="public-log-follow" key={id}><strong>{name(id)}さん</strong>は、{name(source)}さんの恋人だったため後追いしました。</p>)}
     </li>)}</ol>;
   return <section className={`panel public-log ${grouped?'review-timeline':''}`} aria-labelledby="public-log-title">
