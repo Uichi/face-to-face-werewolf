@@ -1,15 +1,20 @@
 import type { GameView } from './game-api.ts';
 import type { PublicLogEvent } from '../domain/game.ts';
-export type ResultFrame = { id: string; kind: 'dawn' | 'death' | 'notice' | 'victory'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves' };
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves' };
 type PublicGame = GameView['public'];
 // Only public snapshots enter presentation; roles and private actions are never read.
 export function resultFrames(previous: PublicGame, current: PublicGame, name: (id: string) => string): ResultFrame[] {
-  if (previous.id !== current.id || !['execution','morning','hunter','finished'].includes(current.phase)) return [];
+  if (previous.id !== current.id) return [];
+  if (previous.phaseId !== current.phaseId && previous.phase !== current.phase) {
+    if (['firstNight','night'].includes(current.phase)) return [{id:'dusk',kind:'dusk',title:'夜へ',detail:'',duration:1250}];
+    if (previous.phase === 'firstNight' && current.phase === 'discussion') return [{id:'dawn',kind:'dawn',title:'朝へ',detail:'',duration:1250}];
+  }
+  if (!['execution','morning','hunter','finished'].includes(current.phase)) return [];
   const seen = new Set((previous.publicLog ?? []).map(e => e.id));
   const events = (current.publicLog ?? []).filter(e => !seen.has(e.id));
   const frames: ResultFrame[] = [];
   const night = events.some(e => ['attack','injection','noVictim'].includes(e.kind));
-  if (night || current.phase === 'morning' && previous.phase === 'night') frames.push({id:'dawn',kind:'dawn',title:'朝になりました',detail:'昨夜の出来事を確認します',duration:2000,label:'夜明け'});
+  if (night || current.phase === 'morning' && previous.phase === 'night') frames.push({id:'dawn',kind:'dawn',title:'朝へ',detail:'',duration:1250});
   const deaths = new Set<string>();
   const follow = (event: PublicLogEvent) => {
     for (const id of event.followedIds ?? []) if (!deaths.has(id)) {

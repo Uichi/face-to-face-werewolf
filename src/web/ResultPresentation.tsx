@@ -12,6 +12,8 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
   const [held, setHeld] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const current = frames[index];
+  const transition = current?.kind === 'dusk' || current?.kind === 'dawn';
+  const modal = !!current && !transition;
   const phase = useRef(game.phaseId);
   useEffect(() => {
     const old = previous.current; previous.current = game;
@@ -29,10 +31,10 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     return () => clearTimeout(timer);
   }, [current, held]);
   useEffect(() => {
-    if (!current) return;
+    if (!modal) return;
     const node = dialog.current; node?.showModal();
     return () => { node?.close(); };
-  }, [!!current]);
+  }, [modal]);
   useEffect(() => {
     const skip = () => setFrames([]);
     const suspend = () => { previous.current = null; skip(); };
@@ -42,7 +44,7 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     document.addEventListener('visibilitychange', visible); window.addEventListener('offline', suspend); media.addEventListener('change', reduced);
     return () => { document.removeEventListener('visibilitychange', visible); window.removeEventListener('offline', suspend); media.removeEventListener('change', reduced); };
   }, []);
-  return <><div inert={!!current} aria-hidden={current ? true : undefined}>{allowReplay && ['execution','morning','hunter','finished'].includes(game.phase) && <button className="secondary-button solo-result-replay" onClick={() => { setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); setHeld(false); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && <dialog ref={dialog} className={`result-presentation ${frames[0]?.kind === 'dawn' ? 'from-night' : ''}`} aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
+  return <><div inert={modal} aria-hidden={modal ? true : undefined}>{allowReplay && ['execution','morning','hunter','finished'].includes(game.phase) && <button className="secondary-button solo-result-replay" onClick={() => { setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); setHeld(false); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && transition && <div className={`day-night-transition transition-${current.kind}`} key={`${game.id}:${current.id}:${game.phaseId}`}><div className="celestial-scene" role="img" aria-label={current.kind === 'dusk' ? '夜へ切り替わります' : '朝へ切り替わります'}><svg className="celestial moon" viewBox="0 0 100 100" aria-hidden="true"><path d="M70 13A39 39 0 1 0 87 71 36 36 0 0 1 70 13Z"/></svg><svg className="celestial sun" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="20"/><path d="M50 6v10M50 84v10M6 50h10M84 50h10M19 19l7 7M74 74l7 7M19 81l7-7M74 26l7-7"/></svg></div><button className="text-button transition-skip" onClick={() => setIndex(value => value + 1)}>演出をスキップ</button></div>}{current && !transition && <dialog ref={dialog} className="result-presentation" aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
     <div className={`result-scene scene-${current.kind} ${current.team ?? ''}`} key={current.id}>
       <div className="presentation-position" aria-label={`全${frames.length}件中${index + 1}件目`}>{index + 1} / {frames.length}</div>
       <span className="section-number">{current.day !== undefined ? `${current.day}日目 · ` : ''}{current.label ?? '公開された出来事'}</span>

@@ -22,7 +22,7 @@ test('夜の直接死亡を先に並べてから後追い・発砲・勝利を�
 test('狩人待ちは勝利にせず、朝の死亡なし・処刑なしも明示する',()=>{
  const next=snapshot();next.phase='hunter';next.winner=null;next.publicLog=[{id:'n',day:1,kind:'noVictim'},{id:'h',day:1,kind:'hunterReady',playerId:'H'}];
  const old={...next,phase:'night' as const,publicLog:[]};const frames=resultFrames(old,next,name);
- assert.equal(frames[0]!.duration,2000);assert.match(frames[1]!.title,/犠牲者はいません/);assert.ok(!frames.some(f=>f.kind==='victory'));
+ assert.equal(frames[0]!.duration,1250);assert.match(frames[1]!.title,/犠牲者はいません/);assert.ok(!frames.some(f=>f.kind==='victory'));
  next.phase='execution';next.publicLog=[{id:'e',day:1,kind:'noExecution'}];assert.match(resultFrames(old,next,name)[0]!.title,/誰も処刑されません/);
 });
 test('再接続後の既知イベントや過去の夜を次の結果に混ぜない',()=>{
@@ -35,4 +35,24 @@ test('試遊の明示的な再生は最後の夜だけを見せ、過去の処�
  const { latestResultFrames }=await import('../src/web/result-presentation.ts');
  const next=snapshot();next.phase='morning';next.winner=null;next.publicLog=[{id:'e',day:1,kind:'execution',playerId:'old'},{id:'a',day:1,kind:'attack',playerId:'A'},{id:'i',day:1,kind:'injection',playerId:'B'}];
  assert.deepEqual(latestResultFrames(next,name).map(f=>f.id),['dawn','a','i']);
+});
+
+
+test('昼から夜・初夜から昼は文字を増やさず短い切り替えを1回だけ表示',()=>{
+ const base=snapshot();const old={...base,phase:'execution' as const,phaseId:10};
+ for(const phase of ['night','firstNight'] as const){
+  const next={...base,phase,phaseId:11};const frames=resultFrames(old,next,name);
+  assert.deepEqual(frames.map(f=>f.kind),['dusk']);assert.equal(frames[0]!.duration,1250);assert.equal(frames[0]!.detail,'');
+  assert.deepEqual(resultFrames(next,next,name),[]);
+ }
+ const first={...base,phase:'firstNight' as const,phaseId:12};
+ const day={...base,phase:'discussion' as const,phaseId:13};
+ assert.deepEqual(resultFrames(first,day,name).map(f=>f.kind),['dawn']);
+ assert.deepEqual(resultFrames({...first,id:'other'},day,name),[]);
+});
+test('夜明けは既存結果の先頭だけに入り、狩人の発砲後には繰り返さない',()=>{
+ const next=snapshot();next.phase='morning';next.winner=null;next.publicLog=[{id:'n',day:2,kind:'noVictim'}];
+ const night={...next,phase:'night' as const,phaseId:10,publicLog:[]};
+ assert.deepEqual(resultFrames(night,next,name).map(f=>f.kind),['dawn','notice']);
+ const hunter={...next,phase:'hunter' as const};assert.deepEqual(resultFrames(hunter,next,name),[]);
 });
