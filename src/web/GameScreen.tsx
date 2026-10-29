@@ -1,3 +1,4 @@
+import HostControls from './HostControls.tsx';
 import BreadImage from './BreadImage.tsx';
 import ActionSelection from './ActionSelection.tsx';
 import { actionAdvice, actionChoice, breadNames } from './action-choice.ts';
@@ -177,14 +178,10 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {seconds===0&&['vote','runoff','night'].includes(phase)&&<p className="inline-note">時間は終了しましたが、操作は引き続き受け付けています。自動で投票や能力使用はしません。</p>}
        {pub.voteResult&&['runoff','execution'].includes(phase)&&<div className="vote-counts"><h3>得票数</h3>{Object.entries(pub.voteResult.counts).map(([id,n])=><div key={id}><span>{name(id)}</span><b>{n}票</b></div>)}</div>}
      </section>
+     {host&&<HostControls game={pub} seconds={seconds} disabled={busy||!!pending||offline} hostAlive={self.alive} name={name} onAction={action=>void send(action)} onConfirm={(text,action,targetId)=>setDialog({text,action,targetId})}/>}
      <PublicLog events={pub.publicLog??[]} room={room}/>
      <section className="panel"><div className="panel-heading"><h2>参加者</h2><span>{alive.length}人生存</span></div><div className="game-players">{pub.players.map(p=><div className={p.alive?'':'eliminated'} key={p.id}><span>{name(p.id)}{p.id===me?'（あなた）':''}</span><small>{p.alive?'生存':'脱落'}</small></div>)}</div></section>
-     {host&&<section className="panel host-controls"><h2>主催者の操作</h2><div className="host-actions">
-       {['discussion','vote','runoff','night','hunter'].includes(phase)&&<button className="secondary-button" disabled={busy} onClick={()=>void send('extend')}>60秒延長する</button>}
-       {phase==='hunter'&&seconds===0&&<button className="secondary-button" disabled={busy} onClick={()=>setDialog({text:'狩人の発砲を中止しますか？ 発砲せずに勝敗判定と次の段階へ進みます。',action:'cancelShot'})}>発砲を中止する</button>}
-       {resultPhase&&!pub.resultConfirmation&&<button className="primary" disabled={busy} onClick={()=>void send('next')}>次へ進む</button>}
-       {phase==='discussion'&&<button className="secondary-button" disabled={busy} onClick={()=>setDialog({text:'議論を終了して、投票に進みますか？',action:'startVote'})}>投票へ進む</button>}
-     </div><details><summary>復帰できない参加者がいるとき</summary><p>対象者を脱落扱いにします。投票・夜の操作中は全員の操作を取り消し、その段階をやり直します。</p>{alive.map(p=><button className="remove-player" disabled={busy} key={p.id} onClick={()=>setDialog({text:`${name(p.id)}さんを脱落扱いにしますか？ この試合には復帰できません。`,action:'remove',targetId:p.id})}>{name(p.id)}さんを脱落扱いにする</button>)}</details></section>}
+
    </>}
    {dialog&&<Confirmation onClose={()=>setDialog(null)}><h2 id="confirm-title">確認してください</h2><p>{dialog.text}</p><button className="primary" autoFocus disabled={busy} onClick={()=>void send(dialog.action,dialog.targetId?{targetId:dialog.targetId}:{})}>確定する</button><button className="secondary-button" onClick={()=>setDialog(null)}>戻る</button></Confirmation>}
  </div></ResultPresentation>;

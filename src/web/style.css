@@ -594,3 +594,17 @@ footer small { margin-left: auto; font-size: 12px; }
 .bread-notice:has(.bread-image) { flex-wrap:wrap; align-items:center; }
 .bread-notice:has(.bread-image) > div { flex:1 1 180px; }
 .public-log .bread-image.compact { display:inline-block; width:64px; height:64px; vertical-align:middle; margin:0 10px 0 0; }
+
+.host-controls .panel-heading { flex-wrap:wrap; gap:8px; }
+.host-controls .panel-heading > span { color:var(--gold); font-size:12px; }
+.host-instruction { line-height:1.8; }
+.host-eliminated-note { padding:10px 12px; border-left:3px solid var(--gold); font-size:13px; }
+.host-controls .host-actions { display:flex; flex-direction:column; gap:12px; }
+.host-controls .host-main-action { width:100%; min-height:64px; display:flex; flex-direction:column; align-items:center; gap:6px; white-space:normal; }
+.host-main-action span { display:block; font-size:12px; font-weight:400; line-height:1.6; }
+.host-progress { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; padding:14px 0; }
+.host-progress progress { flex-basis:100%; width:100%; }
+.host-troubleshooting { margin-top:20px; border-top:1px solid var(--line); padding-top:10px; }
+.host-troubleshooting summary { min-height:44px; cursor:pointer; padding:10px 0; }
+.host-troubleshooting details { padding:8px 0; }
+.host-cancel-shot { padding-bottom:16px; }
