@@ -56,3 +56,15 @@ test('夜明けは既存結果の先頭だけに入り、狩人の発砲後に�
  assert.deepEqual(resultFrames(night,next,name).map(f=>f.kind),['dawn','notice']);
  const hunter={...next,phase:'hunter' as const};assert.deepEqual(resultFrames(hunter,next,name),[]);
 });
+
+test('狩人の照準は公開発動、発砲の金色演出は確定した公開発砲だけに付く',()=>{
+ const next=snapshot();next.phase='hunter';next.winner=null;next.publicLog=[{id:'ready',kind:'hunterReady',day:1,playerId:'H'}];
+ const old={...next,phase:'vote' as const,publicLog:[]};
+ assert.equal(resultFrames(old,next,name)[0]!.hunterEffect,'ready');
+ next.phase='finished';next.winner='village';next.publicLog.push({id:'shot',kind:'shot',day:1,playerId:'W',actorId:'H',followedIds:['L']});
+ const before={...next,phase:'hunter' as const,winner:null,publicLog:next.publicLog.slice(0,1)};
+ const frames=resultFrames(before,next,name);
+ assert.deepEqual(frames.map(f=>f.id),['shot','shot:follow:L','victory']);assert.equal(frames[0]!.hunterEffect,'shot');assert.ok(frames.slice(1).every(f=>!f.hunterEffect));
+ assert.deepEqual(resultFrames(next,next,name),[]);
+ next.publicLog=[{id:'cancel',kind:'shotCancelled',day:1,reason:'操作不能'}];assert.ok(resultFrames(old,next,name).every(f=>f.hunterEffect!=='shot'));
+});

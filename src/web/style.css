@@ -657,3 +657,24 @@ footer small { margin-left: auto; font-size: 12px; }
 .scene-thief { min-height:0; }
 .scene-thief h2 { font-size:clamp(24px,6vw,32px); margin:14px 0; }
 .scene-thief .thief-exchange { max-width:320px; margin:12px auto; }
+
+/* Hunter effects only decorate public, server-confirmed events. */
+.hunter-effect { position:relative; width:132px; height:190px; margin:16px auto; isolation:isolate; }
+.hunter-effect .role-art { width:100%; height:100%; object-fit:contain; margin:0; }
+.hunter-reticle { position:absolute; top:50%; left:50%; width:100px; height:100px; transform:translate(-50%,-50%); color:var(--gold-bright); stroke:currentColor; stroke-width:1.6; filter:drop-shadow(0 1px 3px #000); }
+.hunter-center { fill:currentColor; stroke:none; }
+.hunter-effect-ready .hunter-reticle { border-radius:50%; background:#09100e55; animation:hunter-aim-arrive 300ms ease-out both; }
+.hunter-effect-shot { width:112px; height:112px; margin:8px auto 12px; }
+.hunter-effect-shot .hunter-reticle { width:104px; height:104px; animation:hunter-aim-lock 450ms ease-out both; }
+.hunter-shot-ring { position:absolute; inset:8px; border:2px solid var(--gold-bright); border-radius:50%; animation:hunter-shot-glow 750ms ease-out both; }
+.result-scene.hunter-shot-confirmed { border-radius:12px; animation:hunter-result-glow 800ms ease-out both; }
+.result-scene.hunter-shot-confirmed h2 { margin:8px 0 12px; }
+@keyframes hunter-aim-arrive { from { opacity:0; transform:translate(-50%,-50%) scale(1.15); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+@keyframes hunter-aim-lock { from { opacity:.5; transform:translate(-50%,-50%) scale(1.25) rotate(10deg); } to { opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0); } }
+@keyframes hunter-shot-glow { 0% { opacity:0; transform:scale(.7); box-shadow:0 0 0 #d8bb7800; } 35% { opacity:.7; transform:scale(1); box-shadow:0 0 24px #d8bb7855; } 100% { opacity:0; transform:scale(1.22); box-shadow:0 0 32px #d8bb7800; } }
+@keyframes hunter-result-glow { 0%,100% { background:transparent; } 35% { background:#d8bb7818; } }
+@media(prefers-reduced-motion:reduce) { .hunter-effect *,.result-scene.hunter-shot-confirmed { animation:none!important; } .hunter-shot-ring { display:none; } }
+.result-presentation:has(.hunter-effect) { padding:24px; }
+.result-scene .hunter-effect-ready { width:94px; height:140px; margin:8px auto; }
+.result-scene .hunter-effect-ready .hunter-reticle { width:84px; height:84px; }
+.result-scene:has(.hunter-effect-ready) h2 { font-size:clamp(24px,6vw,30px); margin:12px 0; }

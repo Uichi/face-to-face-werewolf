@@ -1,3 +1,4 @@
+import HunterEffect from './HunterEffect.tsx';
 import ThiefExchangeCards from './ThiefExchangeCards.tsx';
 import HostControls from './HostControls.tsx';
 import BreadImage from './BreadImage.tsx';
@@ -171,7 +172,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>
      </div></div>}</section>}
      <section className="panel phase-panel">{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
-       {phase==='hunter'&&<><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{advice&&<p className="inline-note action-advice">{advice}</p>}{canSelect&&selector}{!priv?.confirmed&&selectionCard}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
+       {phase==='hunter'&&<><HunterEffect/><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{advice&&<p className="inline-note action-advice">{advice}</p>}{canSelect&&selector}{!priv?.confirmed&&selectionCard}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
        {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職と必要な操作を確認し、完了してください。</p>{self.alive&&!thiefChoice&&confirmButton}</>}
        {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛・占いはありません。パン屋は最初に届けるパンを選び、怪盗は交換後の役職を「あなただけの情報」で確認できます。</p>{self.alive&&!breadChoice&&confirmButton}</>}
        {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><BreadImage type={pub.breadDelivery.breadType}/><div><strong>{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}<p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}

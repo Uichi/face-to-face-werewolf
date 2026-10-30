@@ -2,7 +2,7 @@ import { publicThiefReveal } from './thief-reveal.ts';
 import type { ThiefReveal } from './thief-reveal.ts';
 import type { GameView } from './game-api.ts';
 import type { PublicLogEvent } from '../domain/game.ts';
-export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal };
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; hunterEffect?: 'ready' | 'shot' };
 type PublicGame = GameView['public'];
 // Only public snapshots enter presentation; roles and private actions are never read.
 export function resultFrames(previous: PublicGame, current: PublicGame, name: (id: string) => string): ResultFrame[] {
@@ -35,11 +35,11 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
       deaths.add(id);
       const votes = event.kind === 'execution' && current.voteResult?.executedId === id ? current.voteResult.counts[id] : undefined;
       const reason = event.kind === 'execution' ? `${votes === undefined ? '' : `${votes}票で`}処刑されました` : event.kind === 'attack' ? '人狼の襲撃で犠牲になりました' : event.kind === 'injection' ? '2回目の注射を受けたため死亡しました' : '狩人の発砲で脱落しました';
-      frames.push({id:event.id,kind:'death',title:`${name(id)}さん`,detail:reason,duration:4000,label:({execution:'処刑',attack:'人狼の襲撃',injection:'注射による死亡',shot:'狩人の発砲'} as Record<string,string>)[event.kind],day:event.day});
+      frames.push({id:event.id,kind:'death',title:`${name(id)}さん`,detail:reason,duration:4000,label:({execution:'処刑',attack:'人狼の襲撃',injection:'注射による死亡',shot:'狩人の発砲'} as Record<string,string>)[event.kind],day:event.day,...(event.kind==='shot'?{hunterEffect:'shot' as const}:{})});
     }
     if (event.kind === 'noExecution' || event.kind === 'noVictim') frames.push({id:event.id,kind:'notice',title:event.kind === 'noExecution' ? '誰も処刑されませんでした' : '襲撃による犠牲者はいませんでした',detail:event.kind === 'noVictim' ? '犠牲者が出なかった理由は公開されません。' : '投票の結果、処刑はありません。',duration:3500,label:event.kind === 'noExecution' ? '投票結果' : '襲撃結果',day:event.day});
     if (event.kind === 'execution' || event.kind === 'shot') follow(event);
-    if (event.kind === 'hunterReady') frames.push({id:event.id,kind:'notice',title:`${id ? name(id) : '狩人'}さんは狩人でした`,detail:'最後の発砲を行います。勝敗はまだ確定していません。',duration:4000,label:'狩人の能力',day:event.day});
+    if (event.kind === 'hunterReady') frames.push({id:event.id,kind:'notice',title:`${id ? name(id) : '狩人'}さんは狩人でした`,detail:'最後の発砲を行います。勝敗はまだ確定していません。',duration:4000,label:'狩人の能力',day:event.day,hunterEffect:'ready'});
     if (event.kind === 'shotCancelled') frames.push({id:event.id,kind:'notice',title:'狩人の発砲を中止しました',detail:event.reason ?? '',duration:3500,label:'狩人の発砲',day:event.day});
   }
   if (!nightFollowed) events.filter(e => ['attack','injection'].includes(e.kind)).forEach(follow);
