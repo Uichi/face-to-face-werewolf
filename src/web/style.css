@@ -678,3 +678,10 @@ footer small { margin-left: auto; font-size: 12px; }
 .result-scene .hunter-effect-ready { width:94px; height:140px; margin:8px auto; }
 .result-scene .hunter-effect-ready .hunter-reticle { width:84px; height:84px; }
 .result-scene:has(.hunter-effect-ready) h2 { font-size:clamp(24px,6vw,30px); margin:12px 0; }
+
+/* This class is mounted only inside the revealed private card panel. */
+.role-reveal-card.has-private-glow { position:relative; border-radius:12px; animation:private-card-glow 1400ms ease-out both; }
+.role-reveal-card.has-private-glow::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; border-radius:12px; border:1px solid transparent; animation:private-card-sheen 1400ms ease-out both; }
+@keyframes private-card-glow { 0%,100% { box-shadow:0 0 0 #d8bb7800; } 40% { box-shadow:0 0 22px #d8bb7880,0 0 48px #d8bb7833; } }
+@keyframes private-card-sheen { 0%,100% { background:#eed39c00; border-color:transparent; } 40% { background:#eed39c24; border-color:var(--gold-bright); } }
+@media(prefers-reduced-motion:reduce) { .role-reveal-card.has-private-glow,.role-reveal-card.has-private-glow::after { animation:none!important; } }
