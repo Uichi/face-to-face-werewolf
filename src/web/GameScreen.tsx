@@ -1,3 +1,4 @@
+import ThiefExchangeCards from './ThiefExchangeCards.tsx';
 import HostControls from './HostControls.tsx';
 import BreadImage from './BreadImage.tsx';
 import ActionSelection from './ActionSelection.tsx';
@@ -46,6 +47,8 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const [busy, setBusy] = useState(false);
  const [revealed, setRevealed] = useState(false);
  const [flipping, setFlipping] = useState(false);
+ const [thiefMotion, setThiefMotion] = useState(false);
+ const finishThief=useCallback(()=>setThiefMotion(false),[]);
  const [roleSeen, setRoleSeen] = useState(false);
  const finishReveal=useCallback(()=>{setFlipping(false);setRoleSeen(true);},[]);
  const [wolfStrength, setWolfStrength] = useState<1|2|3>(2);
@@ -86,7 +89,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    return () => { active.current = false; clearInterval(tick); if (poll) clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
  }, [refresh, room.id, localDriver]);
  useEffect(() => { if (localDriver) apply(localDriver.response); }, [localDriver?.response, apply, localDriver]);
- useEffect(() => { setRevealed(false); setFlipping(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
+ useEffect(() => { setRevealed(false); setFlipping(false); setThiefMotion(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
  useEffect(() => { if (helpOpen) { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); } }, [helpOpen]);
  useEffect(() => { if (!revealed) return; const timer=setTimeout(() => { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); }, 20_000); return () => clearTimeout(timer); }, [revealed]);
 
@@ -132,7 +135,10 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    let storage: Storage | undefined;
    try { storage=window.localStorage; } catch { /* Keep working in private browsing. */ }
    const first=claimRoleReveal(pub.id,me,storage);
-   const animate=first&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   const exchangeFirst=!!priv?.thiefExchange?.targetId&&claimRoleReveal(pub.id+':thief-exchange',me,storage);
+   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   setThiefMotion(exchangeFirst&&!reduced);
+   const animate=first&&!exchangeFirst&&!reduced;
    setFlipping(animate);setRevealed(true);if(!animate)setRoleSeen(true);
  };
  const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=>{const blocked=p.id===blockedGuardId;return <button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending||offline||blocked} onClick={()=>void send('select',{targetId:p.id,...(night&&role==='wolf'?{strength:wolfStrength}:{})})}>{name(p.id)}<span>{blocked?'前夜に護衛':priv?.selection===p.id?'選択中':'選ぶ'}</span></button>})}{night&&role==='doctor'&&<button className={`target-button ${priv?.selection==='__no_injection__'?'selected':''}`} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:'__no_injection__'})} aria-pressed={priv?.selection==='__no_injection__'}>注射しない<span>{priv?.selection==='__no_injection__'?'選択中':'選ぶ'}</span></button>}{canVoteNoExecution&&<button className={`target-button no-execution ${priv?.selection===NO_EXECUTION_ID?'selected':''}`} aria-pressed={priv?.selection===NO_EXECUTION_ID} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:NO_EXECUTION_ID})}>誰も処刑しない<span>{priv?.selection===NO_EXECUTION_ID?'選択中':'選ぶ'}</span></button>}</div>;
@@ -150,7 +156,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
    {!self.alive&&!hunterShot&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
    {phase==='finished'?<GameResult game={pub} room={room}>{game.personalNotice?.kind==='endurance'&&<p className="inline-note" role="status">あなただけへの通知：{game.personalNotice.day}日目の夜、筋肉で襲撃に耐えました。襲撃への耐久は使用済みです。</p>}{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じ設定で再戦（待機室へ）</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
-     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">{priv.confirmed&&<div hidden={flipping}>{selectionCard}</div>}<RoleRevealCard role={priv.role} animate={flipping} onComplete={finishReveal}/><div hidden={flipping}><span className="role-team">{teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
+     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">{priv.confirmed&&<div hidden={flipping}>{selectionCard}</div>}{thiefMotion&&priv.thiefExchange?.targetId?<ThiefExchangeCards thiefName="あなた" targetName={name(priv.thiefExchange.targetId)+'さん'} stolenRole={priv.thiefExchange.stolenRole} animate privateView onComplete={finishThief}/>:<RoleRevealCard role={priv.role} animate={flipping} onComplete={finishReveal}/>}<div hidden={flipping||thiefMotion}><span className="role-team">{teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
        {priv.loverId&&<div className="secret-box"><strong>あなたの恋人</strong><p>{name(priv.loverId)}さん</p></div>}
        {priv.thiefExchange?.targetId&&<div className="secret-box thief-result"><strong>怪盗の交換結果</strong><p><b>{name(priv.thiefExchange.targetId)}さん</b>の「{roleNames[priv.thiefExchange.stolenRole]}」を奪いました。</p><p>あなたの現在の役職は<strong>{roleNames[priv.thiefExchange.stolenRole]}</strong>です。</p></div>}
        {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p><small>仲間が誰を希望したかは表示されません。</small></div>}
@@ -159,6 +165,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
        {night&&canSelect&&ability&&<><p className="night-task">対象を選んだあと、内容を確認して確定してください。</p><h3>{role==='wolf'?'襲撃する人':role==='seer'?'占う人':role==='doctor'?'注射する人':'護衛する人'}を選ぶ</h3>{advice&&<p className="inline-note action-advice">{advice}</p>}{role==='wolf'&&<div className="strength-picker" role="group" aria-label="襲撃の希望度">{([1,2,3] as const).map(value=><button type="button" className={wolfStrength===value?'selected':''} aria-pressed={wolfStrength===value} disabled={busy||!!pending||offline} key={value} onClick={()=>{setWolfStrength(value);if(priv.selection)void send('select',{targetId:priv.selection,strength:value});}}>{value===1?'弱く希望':value===2?'希望':'強く希望'}（{value}）</button>)}</div>}{selector}</>}
        {breadChoice&&canSelect&&<><p className="night-task">{priv.selection?'パンを選びました。確定すると今夜のパンになります。':'今夜焼くパンを選んでください。'}</p><h3>届けるパンを選ぶ</h3>{breadSelector}</>}
+       {thiefChoice&&priv.confirmed&&priv.selection&&<div className="thief-waiting"><img src="/images/roles/card-back.png" alt="裏向きのカード" width="1024" height="1536"/><p>{name(priv.selection)}さん → あなた</p></div>}
        {thiefChoice&&canSelect&&<><h3>役職を奪う人を選ぶ</h3><p>交換はほかの人には知らされません。確定後は変更できません。</p>{selector}</>}
        {(night||breadChoice||thiefChoice)&&<>{!priv.confirmed&&selectionCard}{confirmButton}</>}
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>

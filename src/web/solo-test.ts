@@ -360,3 +360,12 @@ export function createCheckScenario(kind: CheckScenario): SoloSession {
   }
   return session;
 }
+
+export function createThiefRevealScenario(finished = false): SoloSession {
+  let session = createSoloSession('thief', 10);
+  const target = session.game.players.find(player => player.role === 'seer')!;
+  session = applySoloAction(session, 'select', { targetId: target.id });
+  for (const player of session.game.players) session = applySoloAction(session, 'confirm', {}, player.id);
+  if (finished) for (const wolf of session.game.players.filter(player => player.role === 'wolf')) session = applySoloAction(session, 'remove', { targetId: wolf.id });
+  return session;
+}

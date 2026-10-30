@@ -1,3 +1,5 @@
+import ThiefExchangeCards from './ThiefExchangeCards.tsx';
+import { publicThiefReveal } from './thief-reveal.ts';
 import { rankedMembers } from './scoreboard.ts';
 import { explainScore } from './match-review.ts';
 import RoleImage from './RoleImage.tsx';
@@ -24,6 +26,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   const selfScore=game.scores?.find(score=>score.playerId===room.viewerId);
   const leaders=standings.filter(member=>member.rank===1);
   const explanations=Object.fromEntries((game.scores??[]).map(score=>{const player=game.players.find(p=>p.id===score.playerId);return [score.playerId,explainScore(score,player?.role,player?.role?teamOf(player.role)===game.winner:undefined)];}));
+  const exchange = publicThiefReveal(game);
   const ending = game.ending;
   const lastPlayer = ending && game.players.find(p => p.id === ending.playerId);
   const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : ending?.cause === 'injection' ? '2回目の注射を受けたため死亡しました' : ending?.cause === 'shot' ? '狩人に撃たれました' : '途中脱落しました';
@@ -66,6 +69,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
       {game.removals.length>0&&<section className="review-removals"><h3>途中退場の記録</h3>{game.removals.map(removal=><p key={`${removal.playerId}-${removal.day}`}>{removal.day}日目：{name(removal.playerId)}さんが途中退場しました。</p>)}</section>}
     </div>
     {game.scores?<section id="match-review-scores" className="review-scores"><p className="review-caption">累計ポイントの順位です。「得点の理由を見る」で、今回の内訳と採点条件を確認できます。</p><Scoreboard room={room} scores={game.scores} explanations={explanations}/></section>:<p className="review-empty">この試合の得点内訳は記録されていません。</p>}
+    {exchange&&<section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
     <div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
     <div className="result-roles" id="match-review-roles"><h3>全員の役職</h3>{game.players.map(p => {const changed=p.initialRole!==p.role||p.initialWolfbound!==p.wolfbound;return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? changed ? `${roleLabel(p,true)} → ${roleLabel(p)}` : roleLabel(p) : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>})}</div>
     {game.phase === 'finished' && game.players.some(player => player.wolfbound || player.initialWolfbound) && <section className="wolfbound-reveal"><h3>狼憑きの正体</h3><RoleImage role="wolfbound" compact/><p>{game.players.filter(player => player.wolfbound).map(player => `${name(player.id)}さん`).join('、')}が狼憑きでした。</p>{game.players.filter(player => player.initialWolfbound && !player.wolfbound).map(player => <p key={player.id}>{name(player.id)}さんの狼憑き状態は、怪盗へ移りました。</p>)}</section>}

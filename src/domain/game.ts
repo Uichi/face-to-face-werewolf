@@ -379,6 +379,11 @@ export function viewFor(game: Game, viewerId: string) {
   const isFinished = game.phase === 'finished';
   const canSeePrivate = (viewer.alive || game.phase === 'hunter' && game.hunterPending?.actorId === viewerId) && !isFinished;
   const publicInfo = {
+    thiefReveal: isFinished ? (() => {
+      const thief = game.players.find(p => p.initialRole === 'thief' && p.role !== 'thief');
+      const target = game.players.find(p => p.decoy);
+      return thief && target ? { thiefId: thief.id, targetId: target.id, stolenRole: thief.role } : null;
+    })() : null,
     resultConfirmation: false,
     hunter: game.hunterPending ? { actorId: game.hunterPending.actorId, day: game.hunterPending.day } : null,
     scores: isFinished ? structuredClone(game.scores ?? null) : null,

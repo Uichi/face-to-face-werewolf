@@ -1,6 +1,8 @@
+import { publicThiefReveal } from './thief-reveal.ts';
+import type { ThiefReveal } from './thief-reveal.ts';
 import type { GameView } from './game-api.ts';
 import type { PublicLogEvent } from '../domain/game.ts';
-export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves' };
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal };
 type PublicGame = GameView['public'];
 // Only public snapshots enter presentation; roles and private actions are never read.
 export function resultFrames(previous: PublicGame, current: PublicGame, name: (id: string) => string): ResultFrame[] {
@@ -42,6 +44,7 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
   }
   if (!nightFollowed) events.filter(e => ['attack','injection'].includes(e.kind)).forEach(follow);
   if (current.phase === 'finished' && previous.phase !== 'finished' && current.winner) frames.push({id:'victory',kind:'victory',title:`${current.winner === 'village' ? '村側' : '人狼側'}の勝利！`,detail:current.winner === 'village' ? '生存している人狼が0人になりました。' : '生存人狼が、生存人間と同数以上になりました。',duration:5000,label:'勝敗が決まりました',team:current.winner});
+  if(current.phase==='finished'&&previous.phase!=='finished'){const exchange=publicThiefReveal(current);if(exchange)frames.push({id:'thief-reveal',kind:'thief',title:'怪盗の答え合わせ',detail:'',duration:5000,exchange});}
   return frames;
 }
 

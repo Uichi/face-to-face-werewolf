@@ -621,3 +621,39 @@ footer small { margin-left: auto; font-size: 12px; }
 @keyframes celestial-rise { 0%,15% { opacity:0; transform:translateY(24px) scale(.92); } 55%,85% { opacity:1; transform:translateY(0) scale(1); } 100% { opacity:0; transform:translateY(-8px); } }
 @keyframes celestial-set { 0% { opacity:.7; transform:translateY(0); } 45%,100% { opacity:0; transform:translateY(-24px) scale(.92); } }
 @media(prefers-reduced-motion:reduce) { .day-night-transition { display:none; } .celestial { animation:none; } }
+
+.thief-exchange { margin:20px auto; width:100%; max-width:460px; }
+.exchange-pair { display:grid; grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr); gap:10px; align-items:center; }
+.exchange-person { min-width:0; text-align:center; }
+.exchange-person>strong,.exchange-person>span { display:block; overflow-wrap:anywhere; line-height:1.6; font-size:14px; }
+.exchange-person>strong { margin-bottom:10px; color:var(--gold-bright); }
+.exchange-person>span { margin-top:10px; }
+.exchange-slot { position:relative; aspect-ratio:2/3; perspective:900px; }
+.exchange-card { aspect-ratio:2/3; border:1px solid var(--line-gold); border-radius:8px; overflow:hidden; background:var(--surface-inset); display:grid; place-items:center; }
+.exchange-card img { display:block; width:100%; height:100%; object-fit:contain; }
+.exchange-before,.exchange-after { position:absolute; inset:0; backface-visibility:hidden; }
+.exchange-complete .exchange-before { display:none; }
+.exchange-moving .exchange-before { animation:exchange-hide 2s ease-in-out both; }
+.exchange-moving .exchange-after { animation:exchange-reveal 2s ease-in-out both; }
+.exchange-moving .exchange-person:first-child .exchange-slot { animation:exchange-receive 2s ease-in-out both; }
+.exchange-moving .exchange-person:last-child .exchange-slot { animation:exchange-give 2s ease-in-out both; }
+.exchange-private .exchange-person:last-child .exchange-after { display:none; }
+.exchange-private.exchange-complete .exchange-person:last-child .exchange-before { display:block; }
+.exchange-arrow { color:var(--gold-bright); font-size:28px; }
+.thief-waiting { margin:16px auto; text-align:center; }
+.thief-waiting img { width:88px; height:132px; object-fit:contain; border-radius:6px; }
+.result-panel .thief-final-reveal { margin:24px 28px; }
+@keyframes exchange-hide { 0%,40% { opacity:1; transform:rotateY(0); } 60%,100% { opacity:0; transform:rotateY(-90deg); } }
+@keyframes exchange-reveal { 0%,40% { opacity:0; transform:rotateY(90deg); } 65%,100% { opacity:1; transform:rotateY(0); } }
+@keyframes exchange-receive { 0% { transform:translateX(0); } 35% { transform:translateX(18px); } 75%,100% { transform:translateX(0); } }
+@keyframes exchange-give { 0% { transform:translateX(0); } 35% { transform:translateX(-18px); } 75%,100% { transform:translateX(0); } }
+@media(prefers-reduced-motion:reduce) { .thief-exchange * { animation:none!important; } .exchange-moving .exchange-before { display:none; } .exchange-private.exchange-moving .exchange-person:last-child .exchange-before { display:block; } }
+@media(max-width:700px) { .result-panel .thief-final-reveal { margin:24px 18px; } .exchange-pair { gap:6px; grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr); } .exchange-person>strong,.exchange-person>span { font-size:12px; } }
+.exchange-pair { position:relative; }
+.exchange-flying-card { position:absolute; top:32px; right:0; width:calc((100% - 44px)/2); z-index:2; pointer-events:none; animation:exchange-travel 2s ease-in-out both; }
+@keyframes exchange-travel { 0%,12% { opacity:0; transform:translateX(0) rotate(0); } 20% { opacity:1; transform:translateX(0) rotate(4deg); } 50% { opacity:1; transform:translateX(calc(-100% - 44px)) rotate(-4deg); } 65%,100% { opacity:0; transform:translateX(calc(-100% - 44px)) rotate(0); } }
+@media(max-width:700px) { .exchange-flying-card { width:calc((100% - 30px)/2); } }
+.result-presentation:has(.scene-thief) { padding:24px; }
+.scene-thief { min-height:0; }
+.scene-thief h2 { font-size:clamp(24px,6vw,32px); margin:14px 0; }
+.scene-thief .thief-exchange { max-width:320px; margin:12px auto; }

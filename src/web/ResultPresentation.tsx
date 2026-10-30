@@ -1,3 +1,4 @@
+import ThiefExchangeCards from './ThiefExchangeCards.tsx';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { GameView } from './game-api.ts';
@@ -48,7 +49,7 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     <div className={`result-scene scene-${current.kind} ${current.team ?? ''}`} key={current.id}>
       <div className="presentation-position" aria-label={`全${frames.length}件中${index + 1}件目`}>{index + 1} / {frames.length}</div>
       <span className="section-number">{current.day !== undefined ? `${current.day}日目 · ` : ''}{current.label ?? '公開された出来事'}</span>
-      <h2 id="presentation-title">{current.title}</h2><p id="presentation-detail" role="status">{current.detail}</p>
+      <h2 id="presentation-title">{current.title}</h2>{current.exchange&&<ThiefExchangeCards key={current.id} thiefName={(room.members.find(m=>m.id===current.exchange!.thiefId)?.nickname??'怪盗')+'さん'} targetName={(room.members.find(m=>m.id===current.exchange!.targetId)?.nickname??'相手')+'さん'} stolenRole={current.exchange.stolenRole} animate/>}<p id="presentation-detail" role="status">{current.detail}</p>
     </div>
     <p className="presentation-reading-state">{held ? '自動送りを停止中です。読めたら「次へ」を押してください。' : '順番に自動で表示します。止めて読むこともできます。'}</p>
     <div className="presentation-controls"><button className="secondary-button" aria-pressed={held} onClick={() => setHeld(value => !value)}>{held ? '自動送りを再開' : '自動送りを止める'}</button><button className="primary" autoFocus onClick={() => setIndex(value => Math.min(value + 1, frames.length))}>{index === frames.length - 1 ? '結果を見る' : '次へ'}</button></div>
