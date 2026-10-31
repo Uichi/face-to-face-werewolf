@@ -1,3 +1,4 @@
+import { canChooseNoExecution } from './no-execution-choice.ts';
 import { canHighlightEndurance } from './endurance-highlight.ts';
 import HunterEffect from './HunterEffect.tsx';
 import ThiefExchangeCards from './ThiefExchangeCards.tsx';
@@ -127,7 +128,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const breadChoice=!!(room.breadChoices||localDriver)&&role==='baker'&&(phase==='firstNight'||phase==='night');
  const thiefChoice=phase==='roles'&&role==='thief';
  const candidates=alive.filter(p=>(p.id!==me || night&&role==='doctor') && (phase!=='runoff'||pub.runoffIds.includes(p.id)));
- const canVoteNoExecution=!!(room.firstDayNoExecution||localDriver)&&vote&&pub.day===1&&(phase==='vote'||pub.runoffIds.includes(NO_EXECUTION_ID));
+ const canVoteNoExecution=canChooseNoExecution(room,phase,pub.day,pub.runoffIds,!!localDriver);
  const canSelect=(self.alive || hunterShot) && (hunterShot || vote || thiefChoice || (night && ability) || breadChoice) && !priv?.confirmed;
  const blockedGuardId=night&&role==='knight'&&(pub.consecutiveGuard??room.consecutiveGuard)===false?priv?.lastGuardTargetId:null;
  const choice=priv ? actionChoice(phase,role,priv.selection,id=>name(id),priv.attackStrength) : null;
