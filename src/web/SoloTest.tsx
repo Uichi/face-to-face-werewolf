@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { roles, type Role } from '../domain/rules.ts';
 import GameScreen from './GameScreen.tsx';
 import { roleNames } from './types.ts';
-import { createThiefRevealScenario, createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
+import { createShishimaiScenario, createThiefRevealScenario, createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
 const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', hunter:'狩人の発砲', finished: '試合終了' } as const;
@@ -27,6 +27,8 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
     <button className="primary" onClick={() => update(createSoloSession(role, playerCount))}>{playerCount}人で最初から試遊を始める</button>
     <button className="secondary-button" onClick={()=>update(createRandomSoloSession(playerCount))}>ランダム配役で試遊する（自分の役職も抽選）</button>
     <div className="solo-scenarios"><h2>確認したい場面から始める</h2><p>通常と同じ判定処理を通して、選んだ場面をすぐ表示します。</p>
+      <button className="secondary-button" onClick={() => update(createShishimaiScenario(false, playerCount))}>獅子舞で福を配る → 初夜</button>
+      <button className="secondary-button" onClick={() => update(createShishimaiScenario(true))}>獅子舞も勝利 → 結果</button>
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario())}>怪盗の交換演出 → 初夜</button>
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario(true))}>怪盗の答え合わせ → 結果</button>
       {role !== 'thief'  && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}

@@ -145,6 +145,24 @@ function prepareNight(session: SoloSession): SoloSession {
   return { ...session, game };
 }
 
+export function createShishimaiScenario(finished = false, count = 5): SoloSession {
+  let session = completeSoloPhase(createSoloSession('shishimai', count), true);
+  if (!finished) return session;
+
+  const wolf = session.game.players.find(player => player.role === 'wolf')!;
+  const recipients = session.game.players.filter(player => player.role !== 'wolf' && player.id !== SOLO_VIEWER).slice(0, 2);
+  session = applySoloAction(session, 'select', { targetId: JSON.stringify(recipients.map(player => player.id)) });
+  session = completeSoloPhase(session, true);
+  const unblessed = session.game.players.find(player => player.id !== SOLO_VIEWER && player.id !== wolf.id && !recipients.some(recipient => recipient.id === player.id))!;
+  session = applySoloAction(session, 'remove', { targetId: unblessed.id });
+  session = applySoloAction(session, 'startVote');
+  for (const player of session.game.players.filter(player => player.alive)) {
+    session = applySoloAction(session, 'select', { targetId: player.id === wolf.id ? SOLO_VIEWER : wolf.id }, player.id);
+    session = applySoloAction(session, 'confirm', {}, player.id);
+  }
+  return session;
+}
+
 export function createEndingScenario(winner: 'village' | 'wolves'): SoloSession {
   let session = prepareVote(createSoloSession('villager'));
   const wolf = session.game.players.find(player => player.role === 'wolf')!;
