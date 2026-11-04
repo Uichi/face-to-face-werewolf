@@ -282,6 +282,19 @@ footer small { margin-left: auto; font-size: 12px; }
 .final-counts b { margin-left: 8px; font-size: 20px; }
 .game-screen .your-result { display: inline-block; background: var(--surface-inset); border: 1px solid var(--line-gold); border-radius: 24px; padding: 9px 18px; font-size: 15px; font-weight: 600; }
 .winning-members { padding: 0 28px; margin-top: 26px; }
+.shishimai-victory {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(16px, 4vw, 28px);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, #34261b, #1c1915);
+  color: #fff1d7;
+}
+.shishimai-victory > div { min-width: 0; overflow-wrap: anywhere; }
+.shishimai-victory h3 { margin: 4px 0 8px; font-size: clamp(24px, 5vw, 34px); }
+.game-screen .shishimai-victory p { margin: 0; color: inherit; }
+.game-screen .shishimai-victory .shishimai-victory-team { color: #ebc884; font-weight: 700; }
 .winning-members h3, .result-roles h3 { margin: 0 0 12px; }
 .game-screen .winning-members p { font-size: 13px; color: var(--muted); }
 .winning-members ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

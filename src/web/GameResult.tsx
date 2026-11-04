@@ -18,6 +18,8 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   const name = (id: string) => room.members.find(m => m.id === id)?.nickname ?? '参加者';
   const villageWins = game.winner === 'village';
   const winners = game.players.filter(p => p.role === 'shishimai' ? p.id === game.shishimaiWinnerId : p.role && teamOf(p.role) === game.winner);
+  const shishimaiWinner = game.shishimaiWinnerId;
+  const viewerIsShishimai = game.players.some(p => p.id === room.viewerId && p.role === 'shishimai');
   const selfWon = winners.some(p => p.id === room.viewerId);
   const wolves = game.players.filter(p => p.alive && p.role === 'wolf').length;
   const villagers = game.players.filter(p => p.alive && p.role !== 'wolf').length;
@@ -42,6 +44,14 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   };
   const finalEventText = ending ? `${name(ending.playerId)}さんが${finalVotes === null ? verb : `${finalVotes}票で処刑`}${followedNames.length ? `、恋人の${followedNames.join('さん・')}さんが後追い` : ''}` : '試合終了';
   return <section className={`panel result-panel ${villageWins ? 'village-wins' : 'wolves-win'}`} aria-labelledby="winner-title">
+    {shishimaiWinner && <div className="shishimai-victory" aria-labelledby="shishimai-victory-title">
+      <RoleImage role="shishimai" compact />
+      <div>
+        <p className="shishimai-victory-team">{villageWins ? '村側' : '人狼側'}の勝利 ＋ 第三陣営の追加勝利</p>
+        <h3 id="shishimai-victory-title">獅子舞も勝利！</h3>
+        <p><strong>{name(shishimaiWinner)}さん{shishimaiWinner === room.viewerId ? '（あなた）' : ''}</strong>が生き残り、自分以外の生存者全員に福を配りました。</p>
+      </div>
+    </div>}
     {ending && <div className="final-event" id="final-event">
       <div className="section-number">{ending.cause === 'attack' ? '最後の襲撃結果' : '最後の出来事'} · {ending.day}日目{ending.cause === 'attack' ? 'の夜' : ''}</div>
       <p className="final-person"><strong>{name(ending.playerId)}</strong>さんが<br/>{finalVotes === null ? verb : <><b>{finalVotes}票</b>で処刑されました</>}</p>
@@ -56,7 +66,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
       {ending && <div className="decision-flow" aria-label="勝敗が決まった流れ"><div><small>最後の出来事</small><strong>{finalEventText}</strong></div><span aria-hidden="true">↓</span><div><small>処理後の人数</small><strong>人狼 {wolves}人 ／ 人間 {villagers}人</strong></div><span aria-hidden="true">↓</span><div className="decision-winner"><small>勝敗判定</small><strong>{villageWins ? '村側' : '人狼側'}の勝利</strong></div></div>}
       <p id="victory-reason">{villageWins ? '生存している人狼が0人になったため、村側の勝利です。' : `生存人狼${wolves}人が、生存人間${villagers}人と同数以上になったため、人狼側の勝利です。`}</p>
       <div className="final-counts"><span>生存人狼 <b>{wolves}人</b></span><span>生存人間 <b>{villagers}人</b></span></div>
-      <p className="your-result">{selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
+      <p className="your-result">{viewerIsShishimai ? (selfWon ? 'あなたは獅子舞として追加勝利しました' : '獅子舞の追加勝利は達成できませんでした') : selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
     </div>
     <section className="postgame-hub" aria-labelledby="review-heading"><span className="section-number">ROUND REVIEW</span><h3 id="review-heading">振り返って、もう一戦。</h3>
       {selfScore&&<div className="your-score-review"><div><span>あなたの今回の得点</span><strong>＋{selfScore.total}<small>点</small></strong></div><div className="your-score-parts"><span>勝利 ＋{selfScore.victory}</span><span>生存 ＋{selfScore.survival}</span><span>貢献 ＋{selfScore.contribution}</span></div>{selfStanding&&<p>この部屋の累計 <b>{selfStanding.points}点</b> · <b>{selfStanding.rank}位</b></p>}</div>}
@@ -70,7 +80,7 @@ export default function GameResult({ game, room, children }: { game: GameView['p
     </div>
     {game.scores?<section id="match-review-scores" className="review-scores"><p className="review-caption">累計ポイントの順位です。「得点の理由を見る」で、今回の内訳と採点条件を確認できます。</p><Scoreboard room={room} scores={game.scores} explanations={explanations}/></section>:<p className="review-empty">この試合の得点内訳は記録されていません。</p>}
     {exchange&&<section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
-    {game.shishimaiWinnerId && <p className="inline-note">獅子舞の{name(game.shishimaiWinnerId)}さんも勝利しました。生存者全員に福を配りました。</p>}<div className="winning-members"><h3>勝ったメンバー</h3><p>脱落した人も、同じ陣営なら勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</li>)}</ul></div>
+    <div className="winning-members"><h3>勝ったメンバー</h3><p>勝利陣営のメンバーは、脱落していても勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}{p.id === shishimaiWinner ? ' · 獅子舞の追加勝利' : ''}</li>)}</ul></div>
     <div className="result-roles" id="match-review-roles"><h3>全員の役職</h3>{game.players.map(p => {const changed=p.initialRole!==p.role||p.initialWolfbound!==p.wolfbound;return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? changed ? `${roleLabel(p,true)} → ${roleLabel(p)}` : roleLabel(p) : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>})}</div>
     {game.phase === 'finished' && game.players.some(player => player.wolfbound || player.initialWolfbound) && <section className="wolfbound-reveal"><h3>狼憑きの正体</h3><RoleImage role="wolfbound" compact/><p>{game.players.filter(player => player.wolfbound).map(player => `${name(player.id)}さん`).join('、')}が狼憑きでした。</p>{game.players.filter(player => player.initialWolfbound && !player.wolfbound).map(player => <p key={player.id}>{name(player.id)}さんの狼憑き状態は、怪盗へ移りました。</p>)}</section>}
   </section>;
