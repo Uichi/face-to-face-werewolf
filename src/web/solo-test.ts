@@ -31,7 +31,7 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   mine.initialRole = mine.apparentRole = mine.role;
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -90,9 +90,14 @@ export function applySoloAction(session: SoloSession, action: string, payload: R
   throw new Error('この操作は試遊モードでは使えません。');
 }
 
-const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (['firstNight','night'].includes(phase) && role === 'baker') || (phase === 'night' && ['wolf', 'seer', 'knight', 'doctor'].includes(role));
+const needsSelection = (role: Role, phase: Phase) => ['vote', 'runoff'].includes(phase) || (phase === 'roles' && role === 'thief') || (['firstNight','night'].includes(phase) && (role === 'baker' || role === 'shishimai')) || (phase === 'night' && ['wolf', 'seer', 'knight', 'doctor'].includes(role));
 function targetFor(game: Game, actorId: string, preferredTargetId?: string): string {
   const actor = game.players.find(player => player.id === actorId)!;
+  if ((actor.apparentRole ?? actor.role) === 'shishimai' && ['firstNight','night'].includes(game.phase)) {
+    const delivered = actor.decoy ? game.decoyBlessings : game.blessings;
+    const eligible = game.players.filter(p => p.alive && p.id !== actorId && !delivered?.includes(p.id));
+    return JSON.stringify(eligible.slice(0, 1).map(p => p.id));
+  }
   if ((actor.apparentRole ?? actor.role) === 'baker' && ['firstNight','night'].includes(game.phase)) return BREAD_TYPES[Math.floor(Math.random() * BREAD_TYPES.length)]!;
   const candidates = game.players.filter(player => player.alive && (player.id !== actorId || game.phase==='night'&&(game.players.find(p=>p.id===actorId)?.apparentRole??game.players.find(p=>p.id===actorId)?.role)==='doctor')
     && (game.phase !== 'runoff' || game.runoffIds.includes(player.id))

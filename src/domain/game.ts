@@ -40,6 +40,10 @@ export type Game = {
   breadDelivery?: { day: number; breadType: BreadType } | null;
   consecutiveGuard: boolean;
   lastGuardTargets: Record<string, string>;
+  decoyBlessings?: string[];
+  decoyDoubleBlessingUsed?: boolean;
+  blessings?: string[];
+  doubleBlessingUsed?: boolean;
   enduranceUsed?: Record<string, number>;
   injectionCounts?: Record<string,number>;
   injectionHistory?: {actorId:string;targetId:string;day:number}[];
@@ -74,10 +78,47 @@ function enter(game: Game, phase: Phase, now: number): void {
     : ['vote', 'runoff', 'night', 'hunter'].includes(phase) ? now + 60_000 : null;
 }
 
+function blessingTargets(selection: string | undefined): string[] {
+  if (!selection) return [];
+  try {
+    const ids: unknown = JSON.parse(selection);
+    if (Array.isArray(ids) && ids.every(id => typeof id === 'string')) return ids;
+  } catch { /* Invalid selection. */ }
+  throw new Error('福を配る対象が不正です');
+}
+const blessingPhase = (phase: Phase) => phase === 'firstNight' || phase === 'night';
+const eligibleBlessings = (game: Game, actor: Player) => alive(game).filter(p =>
+  p.id !== actor.id && !((actor.decoy ? game.decoyBlessings : game.blessings) ?? []).includes(p.id));
+function validateBlessing(game: Game, actor: Player, selection?: string, selecting = false): string[] {
+  const eligible = eligibleBlessings(game, actor);
+  const targets = blessingTargets(selection);
+  check(targets.length >= (eligible.length && !selecting ? 1 : 0) &&
+    targets.length <= ((actor.decoy ? game.decoyDoubleBlessingUsed : game.doubleBlessingUsed) ? 1 : 2) &&
+    new Set(targets).size === targets.length &&
+    targets.every(id => eligible.some(p => p.id === id)), '福を配る対象が不正です');
+  return targets;
+}
+function distributeBlessings(game: Game): void {
+  const actor = alive(game).find(p => p.role === 'shishimai');
+  const decoy = alive(game).find(p => p.decoy && shownRole(p) === 'shishimai');
+  if (decoy) {
+    const targets = validateBlessing(game, decoy, game.selections[decoy.id]);
+    (game.decoyBlessings ??= []).push(...targets);
+    if (targets.length === 2) game.decoyDoubleBlessingUsed = true;
+  }
+  if (!actor) return;
+  const targets = validateBlessing(game, actor, game.selections[actor.id]);
+  (game.blessings ??= []).push(...targets);
+  if (targets.length === 2) game.doubleBlessingUsed = true;
+}
+function shishimaiWinner(game: Game): string | null {
+  return alive(game).find(p => p.role === 'shishimai' && eligibleBlessings(game, p).length === 0)?.id ?? null;
+}
+
 function finishIfWon(game: Game, now: number): boolean {
   game.winner = getWinner(game.players);
   if (game.winner) {
-    if (game.scoring) game.scores = calculateScores(game.scoring, game.players, game.winner);
+    if (game.scoring) game.scores = calculateScores(game.scoring, game.players, game.winner, shishimaiWinner(game));
     enter(game, 'finished', now);
   }
   return game.winner !== null;
@@ -166,6 +207,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
     }
     enter(game, 'firstNight', now);
   } else if (game.phase === 'firstNight' && allDone(game)) {
+    distributeBlessings(game);
     const baker = alive(game).find(p => p.role === 'baker');
     if (baker) {
       const breadType = resolveBread(game.selections[baker.id]!, random);
@@ -186,7 +228,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       if (result.executedId) {
         const target = game.players.find(p => p.id === result.executedId)!;
         for (const p of alive(game)) {
-          if (game.selections[p.id] === target.id && (teamOf(p.role) === 'village' ? target.role === 'wolf' : teamOf(target.role) === 'village')) recordPoint(game.scoring, p.id, 'contribution');
+          if (p.role !== 'shishimai' && game.selections[p.id] === target.id && (teamOf(p.role) === 'village' ? target.role === 'wolf' : teamOf(target.role) === 'village')) recordPoint(game.scoring, p.id, 'contribution');
         }
         const death = eliminate(game.players, result.executedId, 'execution');
         game.players = death.players;
@@ -203,6 +245,7 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       if (!awaitHunter(game, result.executedId, 'execution', now) && !finishIfWon(game, now)) enter(game, 'execution', now);
     }
   } else if (game.phase === 'night' && allDone(game)) {
+    distributeBlessings(game);
     const actionOf = (p: Player) => ({ actorId: p.id, targetId: game.selections[p.id]! });
     const living = alive(game);
     for (const player of living.filter(player => shownRole(player) === 'knight')) {
@@ -285,6 +328,11 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
         }
         check(['roles', 'firstNight', 'vote', 'runoff', 'night'].includes(game.phase), '対象を選べる段階ではありません');
         check(!game.confirmed.includes(actor.id), '確定済みです');
+        if (blessingPhase(game.phase) && shownRole(actor) === 'shishimai') {
+          validateBlessing(game, actor, action.targetId, true);
+          game.selections[actor.id] = action.targetId;
+          break;
+        }
         const bread = choosesBread(actor, game.phase) && BREAD_TYPES.includes(action.targetId as BreadType);
         const noInjection = game.phase==='night' && shownRole(actor)==='doctor' && action.targetId==='__no_injection__';
         const noExecution = action.targetId === NO_EXECUTION_ID && game.day === 1 && !['roles', 'night'].includes(game.phase);
@@ -313,6 +361,7 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
           resolveShot(game, now, random); break;
         }
         check(['roles', 'firstNight', 'vote', 'runoff', 'night'].includes(game.phase), 'この結果は主催者が次へ進めます');
+        if (blessingPhase(game.phase) && shownRole(actor) === 'shishimai') validateBlessing(game, actor, game.selections[actor.id]);
         if ((game.phase === 'roles' && shownRole(actor) === 'thief') || ['vote', 'runoff'].includes(game.phase) || (game.phase === 'night' && (hasAbility(actor) || choosesBread(actor, game.phase))) || choosesBread(actor, game.phase)) {
           check(Object.hasOwn(game.selections, actor.id), '先に対象を選んでください');
         }
@@ -357,6 +406,14 @@ export function applyCommand(previous: Game, command: Command, now: number, rand
           } else {
             // Preserve existing confirmations/white information, invalidate in-flight commands.
             game.phaseId++;
+            if (game.phase === 'firstNight') {
+              for (const p of alive(game).filter(p => shownRole(p) === 'shishimai')) {
+                if (blessingTargets(game.selections[p.id]).some(id => !alive(game).some(q => q.id === id))) {
+                  delete game.selections[p.id];
+                  game.confirmed = game.confirmed.filter(id => id !== p.id);
+                }
+              }
+            }
             game.confirmed = game.confirmed.filter(id => alive(game).some(p => p.id === id));
             if (game.phase === 'roles' && Object.values(game.selections).includes(action.targetId)) {
               for (const [id, selected] of Object.entries(game.selections)) if (selected === action.targetId) { delete game.selections[id]; game.confirmed = game.confirmed.filter(done => done !== id); }
@@ -386,11 +443,12 @@ export function viewFor(game: Game, viewerId: string) {
     })() : null,
     resultConfirmation: false,
     hunter: game.hunterPending ? { actorId: game.hunterPending.actorId, day: game.hunterPending.day } : null,
+    shishimaiWinnerId: isFinished ? shishimaiWinner(game) : null,
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true } : {}) })),
-    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length])),
+    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length] as const).filter(([role, count]) => role !== 'shishimai' || count > 0)),
     compositionMode: game.randomCandidates ? 'random' as const : undefined,
     randomCandidates: game.randomCandidates ? [...game.randomCandidates] : undefined,
     fixedWolves: game.randomCandidates ? game.players.filter(p=>(p.initialRole??p.role)==='wolf').length : undefined,
@@ -420,6 +478,11 @@ export function viewFor(game: Game, viewerId: string) {
       lastGuardTargetId: shownRole(viewer) === 'knight' ? game.lastGuardTargets[viewerId] ?? null : null,
       attackStrength: game.attackStrengths[viewerId] ?? null,
       endurance: shownRole(viewer)==='bodybuilder'?{used:viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId), day:viewer.role==='bodybuilder'?game.enduranceUsed?.[viewerId]??null:null}:null,
+      blessingReceived: (game.blessings ?? []).includes(viewerId),
+      blessing: shownRole(viewer) === 'shishimai' ? {
+        deliveredIds: [...((viewer.decoy ? game.decoyBlessings : game.blessings) ?? [])],
+        doubleUsed: (viewer.decoy ? game.decoyDoubleBlessingUsed : game.doubleBlessingUsed) === true,
+      } : null,
       injectionHistory: shownRole(viewer)==='doctor'?structuredClone((game.injectionHistory??[]).filter(h=>h.actorId===viewerId)):[],
       results: structuredClone(game.secrets.filter(s => s.recipientId === viewerId)),
     },

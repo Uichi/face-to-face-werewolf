@@ -21,7 +21,7 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
     case 'roles': return s.roleSeen
       ? task('役職の確認を完了してください', '画面の案内に沿って、必要な操作と確認・確定を完了してください。')
       : task('自分の役職を確認してください', '「あなただけの情報」の「タップして表示」を押してください。');
-    case 'firstNight': return task('初夜の確認を完了してください', '自分の情報を確認してから「夜の確認を完了」を押してください。');
+    case 'firstNight': return task('初夜の確認を完了してください', '「あなただけの情報」を確認し、画面の案内に沿って操作を完了してください。');
     case 'discussion': return task('みんなで話し合いましょう', '時間になると自動で投票へ進みます。');
     case 'vote':
     case 'runoff': return s.selected

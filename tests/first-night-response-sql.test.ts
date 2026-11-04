@@ -28,6 +28,60 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   r=await raw('game_command_bodybuilder','confirm',{roomId,gameId,phaseId,requestId});assert.equal(r.game.public.phaseId,discussionPhase);assert.equal(r.game.public.deadline,deadline);
   for(let i=0;i<n;i++){await user(i);r=await raw('game_command_bodybuilder','get',{roomId});assert.equal(r.ok,true);assert.equal(r.game.public.phaseId,discussionPhase);assert.equal(r.game.public.breadDelivered,false);}
  });
+ await t.test('怪盗が獅子舞を奪い、初夜に二人へ福を配って追加勝利する',async()=>{
+  await user(1);
+  let r=await raw('lobby_command_bodybuilder','create',{nickname:'獅子舞テスト',requestId:randomUUID()});
+  const roomId=r.room.id;
+  for(const i of [0,2,3,4]){
+   await user(i);r=await raw('lobby_command_bodybuilder','join',{code:r.room.code,nickname:'参加'+i});
+  }
+  await user(1);
+  r=await raw('lobby_command_bodybuilder','settings',{
+   roomId,revision:r.room.revision,discussionMinutes:3,compositionMode:'custom',
+   composition:{villager:2,wolf:1,seer:0,medium:0,knight:0,thief:1,shishimai:1},
+  });
+  assert.equal(r.room.shishimaiRole,true);
+  r=await raw('game_command_bodybuilder','start',{roomId,revision:r.room.revision,requestId:randomUUID()});
+  const gameId=r.game.public.id;
+  let phaseId=r.game.public.phaseId;
+  const command=(action:string,extra:object={})=>raw('game_command_bodybuilder',action,{roomId,gameId,phaseId,requestId:randomUUID(),...extra});
+  const seats=[];
+  for(let i=0;i<5;i++){
+   await user(i);
+   const view=await raw('game_command_bodybuilder','get',{roomId});
+   seats.push({i,id:view.room.viewerId,role:view.game.private.role});
+  }
+  const thief=seats.find(s=>s.role==='thief')!, decoy=seats.find(s=>s.role==='shishimai')!;
+  const wolf=seats.find(s=>s.role==='wolf')!, villagers=seats.filter(s=>s.role==='villager');
+  await user(thief.i);await command('select',{targetId:decoy.id});
+  for(const s of seats){await user(s.i);r=await command('confirm');}
+  assert.equal(r.game.public.phase,'firstNight');
+  phaseId=r.game.public.phaseId;
+  await user(thief.i);
+  await assert.rejects(()=>command('confirm'),/福を配る対象が不正/);
+  await assert.rejects(()=>command('select',{targetId:JSON.stringify([thief.id])}),/福を配る対象が不正/);
+  await assert.rejects(()=>command('select',{targetId:JSON.stringify([wolf.id,wolf.id])}),/福を配る対象が不正/);
+  const targets=villagers.map(s=>s.id);
+  await command('select',{targetId:JSON.stringify(targets)});
+  await user(decoy.i);await command('select',{targetId:JSON.stringify([thief.id])});
+  for(const s of seats){await user(s.i);r=await command('confirm');}
+  assert.equal(r.game.public.phase,'discussion');
+  assert.equal(r.game.public.shishimaiWinnerId,undefined);
+  for(const s of seats){
+   await user(s.i);r=await raw('game_command_bodybuilder','get',{roomId});
+   assert.equal(r.game.private.blessingReceived,targets.includes(s.id));
+   if(s===thief) assert.deepEqual(r.game.private.blessing,{deliveredIds:targets,doubleUsed:true});
+   else if(s===decoy) assert.deepEqual(r.game.private.blessing,{deliveredIds:[thief.id],doubleUsed:false});
+   else assert.equal(r.game.private.blessing,undefined);
+  }
+  await user(1);phaseId=r.game.public.phaseId;
+  r=await command('remove',{targetId:decoy.id});phaseId=r.game.public.phaseId;
+  r=await command('remove',{targetId:wolf.id});
+  assert.equal(r.game.public.phase,'finished');
+  assert.equal(r.game.public.winner,'village');
+  assert.equal(r.game.public.shishimaiWinnerId,thief.id);
+  assert.deepEqual(r.game.public.scores.find((s:any)=>s.playerId===thief.id),{playerId:thief.id,victory:5,survival:0,contribution:0,total:5});
+ });
  await db.exec('reset role');
  await t.test('パンあり・なし・旧データの未設定値・初夜・通常朝の表示を保持',async()=>{
   const roomId=(await db.query<{room_id:string}>('select room_id from app_private.games limit 1')).rows[0]!.room_id;

@@ -10,6 +10,7 @@ export function reviewDays(events: PublicLogEvent[]): { day: number; label: stri
 export type ScoreExplanation = { victory: string; survival: string; contribution: string; conditions: string[] };
 // Only final public scores and final roles are used. Never infer individual targets.
 export function explainScore(score: Score, role: Role | undefined, won: boolean | undefined): ScoreExplanation {
+  if (role === 'shishimai') return { victory: won ? `追加勝利で${score.victory}点です。` : '追加勝利の条件を満たさなかったため0点です。', survival: `生存点は${score.survival}点です（最大3点）。`, contribution: '獅子舞には貢献点がありません。', conditions: ['終了時に生存し、自分以外の生存者全員に福を配る。'] };
   const victory=won===undefined?'試合終了時にサーバーが確定した勝利点です。':won?`${role?roleNames[role]+'として':''}勝利したため、試合開始時の配点で${score.victory}点です。脱落していても対象です。`:'敗北した陣営のため、勝利点は0点です。';
   const survival=score.survival>0?`夜の処理後に生存した実績で${score.survival}点です（最大3点）。敗北しても獲得します。`:'加点対象の夜を越えた生存点は0点です。初夜や昼の処理では加点しません。';
   const contribution=won===false?'貢献点は勝利陣営だけが獲得するため、今回は0点です。行動の実績がなかったことを意味しません。':score.contribution>0?`有効な行動の実績により${score.contribution}点を獲得しました（最大3点）。`:'確定した貢献点は0点です。加点条件と勝利の両方を満たした場合だけ獲得します。';
