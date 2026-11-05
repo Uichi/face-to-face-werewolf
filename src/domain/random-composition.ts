@@ -1,9 +1,10 @@
 import { DEFAULT_COMPOSITIONS, validateComposition } from './rules.ts';
 import type { Composition, Role, RandomIndex } from './rules.ts';
 export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor','bodybuilder'];
+export const ONLINE_RANDOM_ROLES: Role[] = [...RANDOM_ROLES, 'shishimai'];
 export type CompositionMode = 'standard' | 'custom' | 'random';
 export function randomCombinations(count: number, candidates: readonly Role[]): Composition[] {
-  if (!DEFAULT_COMPOSITIONS[count] || new Set(candidates).size !== candidates.length || candidates.some(role=>!RANDOM_ROLES.includes(role))) throw new Error('抽選候補または人数が不正です');
+  if (!DEFAULT_COMPOSITIONS[count] || new Set(candidates).size !== candidates.length || candidates.some(role=>!ONLINE_RANDOM_ROLES.includes(role))) throw new Error('抽選候補または人数が不正です');
   const wolves = DEFAULT_COMPOSITIONS[count]!.wolf;
   const combinations: Composition[] = [];
   // Reverse iteration preserves the existing binary-mask order for saved candidates.

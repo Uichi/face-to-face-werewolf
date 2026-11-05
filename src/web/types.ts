@@ -12,6 +12,7 @@ export type Room = {
   thiefRole?: boolean;
   bodybuilderRole?: boolean;
   shishimaiRole?: boolean;
+  randomShishimai?: boolean;
   doctorRole?: boolean;
   hunterRole?: boolean;
   firstDayNoExecution?: boolean;

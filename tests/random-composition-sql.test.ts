@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile,readdir } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { randomCombinations, RANDOM_ROLES } from '../src/domain/random-composition.ts';
+import { randomCombinations, ONLINE_RANDOM_ROLES } from '../src/domain/random-composition.ts';
 
 test('ランダム配役SQL：抽選・秘密・互換・再送・再戦・権限',async t=>{
  const db=new PGlite();
@@ -15,7 +15,6 @@ test('ランダム配役SQL：抽選・秘密・互換・再送・再戦・権�
   if(file.includes('0013_baker'))await db.exec(`create or replace function app_private.assert_site_access()returns void language plpgsql as $$begin return;end$$`);
   await db.exec(await readFile(new URL(file,dir),'utf8'));
  }
- await db.exec(await readFile(new URL('202610150025_bodybuilder.sql',dir),'utf8'));
  const users=Array.from({length:6},()=>randomUUID());for(const u of users)await db.query('insert into auth.users values($1)',[u]);
  const user=async(i:number)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[users[i]!]);await db.exec('set role authenticated');};
  const raw=async(fn:string,action:string,payload:object)=>(await db.query<{data:any}>(`select public.${fn}($1,$2::jsonb)data`,[action,JSON.stringify(payload)])).rows[0]!.data;
@@ -28,10 +27,10 @@ test('ランダム配役SQL：抽選・秘密・互換・再送・再戦・権�
  await t.test('全人数でSQLとルールの候補順が一致し恋人と役職上限を守る',async()=>{
   await db.exec('reset role');
   for(let n=5;n<=13;n++){
-   const choices=randomCombinations(n,RANDOM_ROLES);
+   const choices=randomCombinations(n,ONLINE_RANDOM_ROLES);
    for(const i of [0,Math.floor(choices.length/2),choices.length-1]){
     await db.exec(`create or replace function extensions.gen_random_bytes(n integer)returns bytea language sql volatile as $$select decode(case when n=4 then '${i.toString(16).padStart(8,'0')}'else repeat('00',n)end,'hex')$$`);
-    const comp=(await db.query<{comp:any}>('select app_private.random_composition($1,$2::jsonb)comp',[n,JSON.stringify(RANDOM_ROLES)])).rows[0]!.comp;
+    const comp=(await db.query<{comp:any}>('select app_private.random_composition($1,$2::jsonb)comp',[n,JSON.stringify(ONLINE_RANDOM_ROLES)])).rows[0]!.comp;
     assert.deepEqual(comp,choices[i]);
    }
   }

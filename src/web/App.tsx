@@ -1,5 +1,5 @@
 import { initialLobbyComposition, plannedRosterMessage, lobbyCompositionTotal, lobbySettingsKey, resizeLobbyComposition } from './lobby-settings.ts';
-import { RANDOM_ROLES } from '../domain/random-composition.ts';
+import { ONLINE_RANDOM_ROLES as RANDOM_ROLES } from '../domain/random-composition.ts';
 import type { CompositionMode } from '../domain/random-composition.ts';
 import { SETTINGS_KEY, parseFavorite, adaptFavorite, presetComposition } from './saved-settings.ts';
 import type { FavoriteSettings, Preset } from './saved-settings.ts';
@@ -26,7 +26,7 @@ const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
 const names = ['あなた', 'あおい', 'はる', 'みなと', 'ひなた'];
 const demoRoom = (): Room => ({ id: 'preview', code: 'A7C92F4B10', hostId: 'p0', viewerId: 'p0', status: 'waiting', revision: 1,
-  plannedPlayers: null, loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, randomComposition: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
+  plannedPlayers: null, loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, randomShishimai: true, randomComposition: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
   members: names.map((nickname, i) => ({ id: `p${i}`, nickname, connected: true })) });
 function readSaved(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key: string, value: string | null) { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* The auth layer reports storage failures. */ } }
@@ -163,7 +163,7 @@ export default function App() {
         const supported = ([role]: [string, unknown]) => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole) && (role !== 'shishimai' || room.shishimaiRole);
         const compPayload = composition ? Object.fromEntries(Object.entries(composition).filter(supported)) : composition;
         const pointsPayload = victoryPoints ? Object.fromEntries(Object.entries(victoryPoints).filter(supported)) : victoryPoints;
-        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, ...(room.plannedPlayers!==undefined?{plannedPlayers:plannedPlayers??null}:{}), composition: compPayload, discussionMinutes, ...(room.randomComposition ? {compositionMode, randomCandidates} : {}), ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
+        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, ...(room.plannedPlayers!==undefined?{plannedPlayers:plannedPlayers??null}:{}), composition: compPayload, discussionMinutes, ...(room.randomComposition ? {compositionMode, randomCandidates: randomCandidates.filter(role => role !== 'shishimai' || room.randomShishimai)} : {}), ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
         setRoom(current => current?.id === updated.id && current.revision <= updated.revision ? updated : current);
       }
       setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。'); return true;
@@ -278,7 +278,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [consecutiveGuard, setConsecutiveGuard] = useState(room.consecutiveGuard ?? true);
   const [wolfboundEnabled, setWolfboundEnabled] = useState(room.wolfboundEnabled ?? false);
   const [randomMode, setRandomMode] = useState(room.compositionMode === 'random');
-  const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)));
+  const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai)));
   const [custom, setCustom] = useState(room.customComposition);
   const [planned, setPlanned] = useState<number|null>(room.plannedPlayers??null);
   const [draft, setDraft] = useState<Composition>(()=>initialLobbyComposition(room));
@@ -304,7 +304,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
   useEffect(() => {
     const changed=previousSettingsKey.current!==settingsKey || previousRoom.current!==room.id;
-    if(changed) { setPlanned(room.plannedPlayers??null); setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole))); setCustom(room.customComposition); setDraft(initialLobbyComposition(room)); }
+    if(changed) { setPlanned(room.plannedPlayers??null); setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai))); setCustom(room.customComposition); setDraft(initialLobbyComposition(room)); }
     else if(planned===null && previousCount.current!==count) {
       const before=previousCount.current;setDraft(value=>resizeLobbyComposition(value,before,count));
     }
@@ -331,7 +331,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       if (favorite.wolfboundEnabled && room.wolfboundEnabled === undefined) throw new Error('この部屋では保存した狼憑き設定を使えません');
       if(favorite.mode==='random'&&!room.randomComposition)throw new Error('この部屋ではランダム配役を使えません');
       const value = adaptFavorite(favorite, settingsCount, availableRoles);
-      setRandomMode(value.mode==='random'); setCandidates(value.randomCandidates??RANDOM_ROLES.filter(role=>availableRoles.includes(role)));
+      setRandomMode(value.mode==='random'); setCandidates(value.randomCandidates??RANDOM_ROLES.filter(role=>availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai)));
       setCustom(value.composition !== null); setDraft(value.composition ?? { ...DEFAULT_COMPOSITIONS[settingsCount]! });
       setMinutes(value.minutes); setPointsDraft(value.points); setConsecutiveGuard(value.consecutiveGuard); setWolfboundEnabled(value.wolfboundEnabled);
       onNotice('お気に入り設定を呼び出しました。内容を確認して部屋に反映してください。');
@@ -373,7 +373,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
           {room.wolfboundEnabled !== undefined && <label className="check-label"><input type="checkbox" checked={wolfboundEnabled} onChange={e => setWolfboundEnabled(e.target.checked)}/>狼憑きを使用する（50%で村人の中から0〜1人）</label>}
           </div></section>
           <section className="settings-section"><div className="settings-section-title"><span>02</span><h3>配役を決める</h3></div><div className="settings-section-body"><label>配役モード<select value={randomMode?'random':custom?'custom':'standard'} onChange={e=>{setRandomMode(e.target.value==='random');setCustom(e.target.value==='custom');}}><option value="standard">標準</option><option value="custom">カスタム</option>{room.randomComposition&&<option value="random">ランダム</option>}</select></label>
-          {randomMode&&<fieldset><legend>抽選候補</legend><p className="small-note">人狼は{DEFAULT_COMPOSITIONS[settingsCount]?.wolf??'—'}人固定。村人を1人以上残し、候補から人数も抽選します。候補なしなら人狼と村人だけです。人数は終了まで秘密です。</p>{RANDOM_ROLES.filter(role=>availableRoles.includes(role)).map(role=><label className="check-label" key={role}><input type="checkbox" checked={candidates.includes(role)} onChange={e=>setCandidates(e.target.checked?[...candidates,role]:candidates.filter(item=>item!==role))}/>{roleNames[role]}{role==='lover'?'（2人セット）':''}</label>)}</fieldset>}
+          {randomMode&&<fieldset><legend>抽選候補</legend><p className="small-note">人狼は{DEFAULT_COMPOSITIONS[settingsCount]?.wolf??'—'}人固定。村人を1人以上残し、候補から人数も抽選します。候補なしなら人狼と村人だけです。人数は終了まで秘密です。</p>{RANDOM_ROLES.filter(role=>availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai)).map(role=><label className="check-label" key={role}><input type="checkbox" checked={candidates.includes(role)} onChange={e=>setCandidates(e.target.checked?[...candidates,role]:candidates.filter(item=>item!==role))}/>{roleNames[role]}{role==='lover'?'（2人セット）':''}</label>)}</fieldset>}
           {custom && !randomMode && <div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}{role === 'lover' ? <select aria-label="恋人の人数" value={draft.lover} onChange={e => setDraft({ ...draft, lover: Number(e.target.value) })}><option value={0}>0人</option><option value={2}>2人</option></select> : <input aria-label={`${roleNames[role]}の人数`} type="number" min={0} max={role === 'villager' || role === 'wolf' ? 13 : role==='doctor'?2:1} step={1} value={Number.isNaN(draft[role])?'':draft[role]??0} onChange={e => setDraft({ ...draft, [role]: e.target.valueAsNumber })}/>}</label>)}</div>}
           <div className="composition-meter"><strong>{randomMode?'配役人数は終了まで秘密':custom&&draftTotal===null?'役職の人数を入力してください':`配役合計 ${custom?draftTotal:settingsCount}人 / 設定 ${settingsCount}人（参加 ${count}人）`}</strong><p>標準は設定人数に合わせた配役です。予定人数を設定した配役は参加者が増減しても維持します。カスタムの設定人数を変更すると村人数を調整します。人数が足りない場合は役職を減らしてください。</p></div></div></section>
           {room.victoryPoints && <details className="settings-section"><summary>03　役職別の勝利点</summary><div className="settings-section-body"><fieldset className="points-inputs"><legend>役職別の勝利点</legend><p className="small-note">0〜10点。変更は次の試合から適用されます。</p><div className="role-inputs">{availableRoles.map(role => <label key={role}>{roleNames[role]}<input aria-label={`${roleNames[role]}の勝利点`} type="number" min={0} max={10} step={1} required value={Number.isNaN(pointsDraft[role]) ? '' : pointsDraft[role]} onChange={e => setPointsDraft({ ...pointsDraft, [role]: e.target.valueAsNumber })}/></label>)}</div></fieldset></div></details>}
