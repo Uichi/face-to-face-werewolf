@@ -12,6 +12,24 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   if(file.includes('0013_baker'))await db.exec(`create or replace function app_private.assert_site_access()returns void language plpgsql as $$begin return;end$$`);
   await db.exec(await readFile(new URL(file,dir),'utf8'));
  }
+ await t.test('出やすさで候補の抽選枠が変わり、役職上限を守る',async()=>{
+  try {
+   for(const draw of [0,1,2,3]){
+    await db.exec(`create or replace function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(case when n=4 then '${draw.toString(16).padStart(8,'0')}' else repeat('00',n) end,'hex')$$`);
+    for(const weight of ['frequent','rare']){
+     const {comp}=(await db.query<{comp:any}>(
+      'select app_private.random_composition(5,$1::jsonb,$2::jsonb) comp',
+      [JSON.stringify(['shishimai']),JSON.stringify({shishimai:weight})],
+     )).rows[0]!;
+     assert.equal(comp.shishimai, Number(draw >= (weight==='frequent'?1:3)));
+     assert.equal(comp.wolf,1);
+     assert.equal(comp.villager + comp.shishimai,4);
+    }
+   }
+  } finally {
+   await db.exec(`create or replace function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(repeat('00',n),'hex')$$`);
+  }
+ });
  const users=Array.from({length:13},()=>randomUUID());for(const id of users)await db.query('insert into auth.users values($1)',[id]);
  const user=async(i:number)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[users[i]!]);await db.exec('set role authenticated');};
  const raw=async(fn:string,action:string,payload:object)=>(await db.query<{r:any}>(`select public.${fn}($1,$2::jsonb) r`,[action,JSON.stringify(payload)])).rows[0]!.r;
@@ -39,8 +57,10 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   r=await raw('lobby_command_bodybuilder','settings',{
    roomId,revision:r.room.revision,discussionMinutes:3,compositionMode:'custom',
    composition:{villager:2,wolf:1,seer:0,medium:0,knight:0,thief:1,shishimai:1},
+   randomWeights:{shishimai:'rare'},
   });
   assert.equal(r.room.shishimaiRole,true);
+  assert.deepEqual(r.room.randomWeights,{shishimai:'rare'});
   r=await raw('game_command_bodybuilder','start',{roomId,revision:r.room.revision,requestId:randomUUID()});
   const gameId=r.game.public.id;
   let phaseId=r.game.public.phaseId;

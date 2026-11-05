@@ -2,6 +2,9 @@ import { DEFAULT_COMPOSITIONS, validateComposition } from './rules.ts';
 import type { Composition, Role, RandomIndex } from './rules.ts';
 export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor','bodybuilder'];
 export const ONLINE_RANDOM_ROLES: Role[] = [...RANDOM_ROLES, 'shishimai'];
+export const RANDOM_WEIGHT_LABELS = { normal: 'ふつう', frequent: '出やすい', rare: 'レア' } as const;
+export type RandomWeight = keyof typeof RANDOM_WEIGHT_LABELS;
+export type RandomWeights = Partial<Record<Role, RandomWeight>>;
 export type CompositionMode = 'standard' | 'custom' | 'random';
 export function randomCombinations(count: number, candidates: readonly Role[]): Composition[] {
   if (!DEFAULT_COMPOSITIONS[count] || new Set(candidates).size !== candidates.length || candidates.some(role=>!ONLINE_RANDOM_ROLES.includes(role))) throw new Error('抽選候補または人数が不正です');

@@ -4,7 +4,7 @@ import { roles, DEFAULT_COMPOSITIONS } from '../domain/rules.ts';
 // Presence, points totals and membership revisions are not rule changes.
 export function lobbySettingsKey(room: Room): string {
   const custom = room.customComposition && room.composition ? { ...room.composition, villager: 0 } : null;
-  return JSON.stringify([room.id,room.hostId,room.plannedPlayers,room.discussionMinutes,room.consecutiveGuard,room.wolfboundEnabled,room.compositionMode,room.customComposition,custom,room.randomCandidates,room.victoryPoints]);
+  return JSON.stringify([room.id,room.hostId,room.plannedPlayers,room.discussionMinutes,room.consecutiveGuard,room.wolfboundEnabled,room.compositionMode,room.customComposition,custom,room.randomCandidates,room.randomWeights,room.victoryPoints]);
 }
 export function resizeLobbyComposition(draft: Composition, before: number, after: number): Composition {
   const others=roles.filter(role=>role!=='villager').reduce((total,role)=>total+(typeof draft[role]==='number'?draft[role]!:0),0);

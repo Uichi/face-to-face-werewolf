@@ -1,3 +1,4 @@
+import type { RandomWeights } from '../domain/random-composition.ts';
 import type { VictoryPoints } from '../domain/scoring.ts';
 import type { Composition } from '../domain/rules.ts';
 export type Member = { id: string; nickname: string; connected: boolean; points?: number };
@@ -13,6 +14,7 @@ export type Room = {
   bodybuilderRole?: boolean;
   shishimaiRole?: boolean;
   randomShishimai?: boolean;
+  randomWeights?: RandomWeights;
   doctorRole?: boolean;
   hunterRole?: boolean;
   firstDayNoExecution?: boolean;
