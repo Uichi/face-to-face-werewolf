@@ -81,6 +81,17 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   assert.equal(r.game.public.winner,'village');
   assert.equal(r.game.public.shishimaiWinnerId,thief.id);
   assert.deepEqual(r.game.public.scores.find((s:any)=>s.playerId===thief.id),{playerId:thief.id,victory:5,survival:0,contribution:0,total:5});
+  await db.exec('reset role');
+  const {state}=(await db.query<{state:any}>('select state from app_private.games where room_id=$1',[roomId])).rows[0]!;
+  state.blessings=[targets[0]];
+  const resultFor=async(id:string)=>(await db.query<{r:any}>(
+   'select app_private.bodybuilder_view($1::jsonb,$2) r',[JSON.stringify(state),id],
+  )).rows[0]!.r;
+  assert.deepEqual((await resultFor(thief.id)).personalNotice,{kind:'shishimaiShortfall',remaining:1});
+  for(const other of seats.filter(s=>s!==thief)) assert.equal((await resultFor(other.id)).personalNotice,null);
+  state.players.find((p:any)=>p.id===thief.id).alive=false;
+  assert.equal((await resultFor(thief.id)).personalNotice,null);
+
  });
  await db.exec('reset role');
  await t.test('パンあり・なし・旧データの未設定値・初夜・通常朝の表示を保持',async()=>{

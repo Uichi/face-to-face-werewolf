@@ -30,6 +30,8 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
       <button className="secondary-button" onClick={() => update(createShishimaiScenario(false, playerCount))}>獅子舞で福を配る → 初夜</button>
       <button className="secondary-button" onClick={() => update(createShishimaiRecipientScenario())}>福を受け取る → 翌朝</button>
       <button className="secondary-button" onClick={() => update(createShishimaiScenario(true))}>獅子舞も勝利 → 結果</button>
+      <button className="secondary-button" onClick={() => update(createShishimaiScenario(true, 5, 'shortfall'))}>獅子舞の福があと1人足りない → 結果</button>
+      <button className="secondary-button" onClick={() => update(createShishimaiScenario(true, 5, 'eliminated'))}>獅子舞が途中で脱落 → 結果</button>
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario())}>怪盗の交換演出 → 初夜</button>
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario(true))}>怪盗の答え合わせ → 結果</button>
       {role !== 'thief'  && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}

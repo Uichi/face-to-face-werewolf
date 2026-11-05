@@ -12,7 +12,7 @@ import { Scoreboard } from './Points.tsx';
 import { roleNames } from './types.ts';
 import PublicLog from './PublicLog.tsx';
 
-export default function GameResult({ game, room, children }: { game: GameView['public']; room: Room; children: ReactNode }) {
+export default function GameResult({ game, room, personalNotice, children }: { game: GameView['public']; room: Room; personalNotice?: GameView['personalNotice']; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }, [game.id]);
   const name = (id: string) => room.members.find(m => m.id === id)?.nickname ?? '参加者';
@@ -20,6 +20,12 @@ export default function GameResult({ game, room, children }: { game: GameView['p
   const winners = game.players.filter(p => p.role === 'shishimai' ? p.id === game.shishimaiWinnerId : p.role && teamOf(p.role) === game.winner);
   const shishimaiWinner = game.shishimaiWinnerId;
   const viewerIsShishimai = game.players.some(p => p.id === room.viewerId && p.role === 'shishimai');
+  const viewerAlive = game.players.some(p => p.id === room.viewerId && p.alive);
+  const shishimaiLossReason = !viewerAlive
+    ? '試合終了時に生存していなかったため、追加勝利には届きませんでした。'
+    : personalNotice?.kind === 'shishimaiShortfall'
+      ? `福を受け取っていない生存者があと${personalNotice.remaining}人いました。`
+      : '生き残りましたが、自分以外の生存者全員に福を配れませんでした。';
   const selfWon = winners.some(p => p.id === room.viewerId);
   const wolves = game.players.filter(p => p.alive && p.role === 'wolf').length;
   const villagers = game.players.filter(p => p.alive && p.role !== 'wolf').length;
@@ -50,6 +56,14 @@ export default function GameResult({ game, room, children }: { game: GameView['p
         <p className="shishimai-victory-team">{villageWins ? '村側' : '人狼側'}の勝利 ＋ 第三陣営の追加勝利</p>
         <h3 id="shishimai-victory-title">獅子舞も勝利！</h3>
         <p><strong>{name(shishimaiWinner)}さん{shishimaiWinner === room.viewerId ? '（あなた）' : ''}</strong>が生き残り、自分以外の生存者全員に福を配りました。</p>
+      </div>
+    </div>}
+    {viewerIsShishimai && !selfWon && <div className="shishimai-victory" aria-labelledby="shishimai-loss-title">
+      <RoleImage role="shishimai" compact />
+      <div>
+        <p className="shishimai-victory-team">あなただけの結果</p>
+        <h3 id="shishimai-loss-title">獅子舞の追加勝利ならず</h3>
+        <p>{shishimaiLossReason}</p>
       </div>
     </div>}
     {ending && <div className="final-event" id="final-event">

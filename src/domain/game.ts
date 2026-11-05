@@ -463,7 +463,9 @@ export function viewFor(game: Game, viewerId: string) {
     followedIds: (game.phase === 'execution' && game.voteResult?.executedId === game.lastElimination?.playerId && game.lastElimination?.cause === 'execution') || (game.phase === 'morning' && game.victimId && game.lastElimination?.cause === 'attack') ? [...(game.lastElimination?.followedIds ?? [])] : [],
     ending: isFinished ? structuredClone(game.lastElimination ?? null) : null,
   };
-  const personalNotice=isFinished&&viewer.alive&&viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId)?{kind:'endurance' as const,day:game.enduranceUsed![viewerId]!}:null;
+  const personalNotice = isFinished && viewer.alive && viewer.role === 'shishimai' && viewerId !== publicInfo.shishimaiWinnerId
+    ? { kind: 'shishimaiShortfall' as const, remaining: eligibleBlessings(game, viewer).length }
+    : isFinished&&viewer.alive&&viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId)?{kind:'endurance' as const,day:game.enduranceUsed![viewerId]!}:null;
   if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null, personalNotice };
   return {
     public: publicInfo, personalNotice,
