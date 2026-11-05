@@ -145,6 +145,22 @@ function prepareNight(session: SoloSession): SoloSession {
   return { ...session, game };
 }
 
+export function createShishimaiRecipientScenario(): SoloSession {
+  let session = createSoloSession('shishimai', 5);
+  const viewer = session.game.players.find(player => player.id === SOLO_VIEWER)!;
+  const giver = session.game.players.find(player => player.id !== SOLO_VIEWER && player.role === 'villager')!;
+  viewer.role = viewer.initialRole = viewer.apparentRole = 'villager';
+  giver.role = giver.initialRole = giver.apparentRole = 'shishimai';
+
+  session = prepareNight(session);
+  const wolf = session.game.players.find(player => player.role === 'wolf')!;
+  const seer = session.game.players.find(player => player.role === 'seer')!;
+  session = applySoloAction(session, 'select', { targetId: JSON.stringify([viewer.id]) }, giver.id);
+  session = applySoloAction(session, 'select', { targetId: seer.id, strength: 2 }, wolf.id);
+  session = applySoloAction(session, 'select', { targetId: wolf.id }, seer.id);
+  return completeSoloPhase(session, true);
+}
+
 export function createShishimaiScenario(finished = false, count = 5): SoloSession {
   let session = completeSoloPhase(createSoloSession('shishimai', count), true);
   if (!finished) return session;
