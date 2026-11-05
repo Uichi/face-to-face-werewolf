@@ -48,6 +48,12 @@ export default function GameResult({ game, room, personalNotice, children }: { g
     const possessed = initial ? player.initialWolfbound : player.wolfbound;
     return role ? `${roleNames[role]}${possessed ? '（狼憑き）' : ''}` : '';
   };
+  const drawnRoles = game.compositionMode === 'random' && game.phase === 'finished'
+    ? (Object.keys(roleNames) as (keyof typeof roleNames)[]).flatMap(role => {
+        const count = game.composition?.[role] ?? 0;
+        return count > 0 ? [{ role, count }] : [];
+      })
+    : [];
   const finalEventText = ending ? `${name(ending.playerId)}さんが${finalVotes === null ? verb : `${finalVotes}票で処刑`}${followedNames.length ? `、恋人の${followedNames.join('さん・')}さんが後追い` : ''}` : '試合終了';
   return <section className={`panel result-panel ${villageWins ? 'village-wins' : 'wolves-win'}`} aria-labelledby="winner-title">
     {shishimaiWinner && <div className="shishimai-victory" aria-labelledby="shishimai-victory-title">
@@ -86,16 +92,35 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       {selfScore&&<div className="your-score-review"><div><span>あなたの今回の得点</span><strong>＋{selfScore.total}<small>点</small></strong></div><div className="your-score-parts"><span>勝利 ＋{selfScore.victory}</span><span>生存 ＋{selfScore.survival}</span><span>貢献 ＋{selfScore.contribution}</span></div>{selfStanding&&<p>この部屋の累計 <b>{selfStanding.points}点</b> · <b>{selfStanding.rank}位</b></p>}</div>}
       {game.scores&&<div className="review-leaders"><span>累計1位{leaders.length>1?'（同率）':''}</span><p>{leaders.map(member=>member.nickname).join('、')}</p><small>{leaders[0]?.points??0}点 · 同点は同順位、入室順に表示</small></div>}
       <div className="review-next-game"><h4>次の一戦へ</h4><p>同じメンバー・設定・累計ポイントを引き継いで待機室に戻れます。役職は次の試合で配り直します。</p>{children}</div>
-      <nav className="review-navigation" aria-label="振り返りの項目"><a href="#match-review-timeline">日ごとの出来事</a>{game.scores&&<a href="#match-review-scores">順位・得点の理由</a>}<a href="#match-review-roles">全員の役職</a></nav>
+      <nav className="review-navigation" aria-label="振り返りの項目"><a href="#match-review-timeline">日ごとの出来事</a>{game.scores&&<a href="#match-review-scores">順位・得点の理由</a>}{drawnRoles.length > 0 && <a href="#match-review-draw">開始時の抽選配役</a>}<a href="#match-review-roles">最終役職</a></nav>
     </section>
-    {game.compositionMode==='random' &&game.composition&&<section><h3>抽選で決まった開始時の配役</h3><p>{Object.entries(game.composition).filter(([,n])=>n>0).map(([role,n])=>`${roleNames[role as keyof typeof roleNames]} ${n}人`).join(' ／ ')}</p></section>}
+    {drawnRoles.length > 0 && <section id="match-review-draw" aria-labelledby="drawn-roles-title">
+      <h3 id="drawn-roles-title">抽選で決まった開始時の配役</h3>
+      <p className="review-caption">怪盗の交換が起きる前に配られた役職です。</p>
+      <ul className="drawn-role-cards">
+        {drawnRoles.map(({role, count}) => <li key={role}>
+          <RoleImage role={role} compact />
+          <strong>{roleNames[role]}</strong><span>{count}人</span>
+        </li>)}
+      </ul>
+    </section>}
     <div id="match-review-timeline">{game.publicLog?.length?<PublicLog events={game.publicLog} room={room} grouped finalVote={finalVotes!==null&&ending?{playerId:ending.playerId,day:ending.day,count:finalVotes}:undefined}/>:<p className="review-empty">この試合の公開ログは記録されていません。最後の出来事は上の結果をご確認ください。</p>}
       {game.removals.length>0&&<section className="review-removals"><h3>途中退場の記録</h3>{game.removals.map(removal=><p key={`${removal.playerId}-${removal.day}`}>{removal.day}日目：{name(removal.playerId)}さんが途中退場しました。</p>)}</section>}
     </div>
     {game.scores?<section id="match-review-scores" className="review-scores"><p className="review-caption">累計ポイントの順位です。「得点の理由を見る」で、今回の内訳と採点条件を確認できます。</p><Scoreboard room={room} scores={game.scores} explanations={explanations}/></section>:<p className="review-empty">この試合の得点内訳は記録されていません。</p>}
     {exchange&&<section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
     <div className="winning-members"><h3>勝ったメンバー</h3><p>勝利陣営のメンバーは、脱落していても勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}{p.id === shishimaiWinner ? ' · 獅子舞の追加勝利' : ''}</li>)}</ul></div>
-    <div className="result-roles" id="match-review-roles"><h3>全員の役職</h3>{game.players.map(p => {const changed=p.initialRole!==p.role||p.initialWolfbound!==p.wolfbound;return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}><span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span><strong>{p.role ? changed ? `${roleLabel(p,true)} → ${roleLabel(p)}` : roleLabel(p) : ''}</strong><small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small></div>})}</div>
+    <div className="result-roles" id="match-review-roles">
+      <h3>全員の最終役職</h3>
+      {game.players.map(p => {
+        const changed = p.initialRole && (p.initialRole !== p.role || !!p.initialWolfbound !== !!p.wolfbound);
+        return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}>
+          <span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span>
+          <strong className="result-role-label">{roleLabel(p)}{changed && <small>開始時：{roleLabel(p, true)}</small>}</strong>
+          <small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small>
+        </div>;
+      })}
+    </div>
     {game.phase === 'finished' && game.players.some(player => player.wolfbound || player.initialWolfbound) && <section className="wolfbound-reveal"><h3>狼憑きの正体</h3><RoleImage role="wolfbound" compact/><p>{game.players.filter(player => player.wolfbound).map(player => `${name(player.id)}さん`).join('、')}が狼憑きでした。</p>{game.players.filter(player => player.initialWolfbound && !player.wolfbound).map(player => <p key={player.id}>{name(player.id)}さんの狼憑き状態は、怪盗へ移りました。</p>)}</section>}
   </section>;
 }

@@ -701,3 +701,27 @@ footer small { margin-left: auto; font-size: 12px; }
 
 .random-candidate-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
 .random-candidate-row > select { width: auto; min-height: 44px; }
+
+.drawn-role-cards {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 106px), 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.drawn-role-cards li {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 6px;
+  padding: 10px 6px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.drawn-role-cards img { max-width: 100%; }
+.drawn-role-cards li > span { color: var(--muted); }
+.result-role-label > small { display: block; margin-top: 3px; font-weight: 400; }
