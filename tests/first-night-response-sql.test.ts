@@ -113,6 +113,53 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   assert.equal((await resultFor(thief.id)).personalNotice,null);
 
  });
+ await t.test('狂人と狂信者が同席でき、初夜の名前と勝利点を本人の役職で判定する',async()=>{
+  await user(2);
+  let r=await raw('lobby_command_bodybuilder','create',{nickname:'狂信者テスト',requestId:randomUUID()});
+  const roomId=r.room.id;
+  for(const i of [0,1,3,4]){
+   await user(i);r=await raw('lobby_command_bodybuilder','join',{code:r.room.code,nickname:'参加'+i});
+  }
+  await user(2);
+  r=await raw('lobby_command_bodybuilder','settings',{roomId,revision:r.room.revision,discussionMinutes:3,
+   compositionMode:'custom',composition:{villager:2,wolf:1,seer:0,medium:0,knight:0,madman:1,fanatic:1},
+   randomCandidates:['madman','fanatic']});
+  assert.equal(r.room.fanaticRole,true);
+  assert.equal(r.room.composition.fanatic,1);
+  r=await raw('game_command_bodybuilder','start',{roomId,revision:r.room.revision,requestId:randomUUID()});
+  const gameId=r.game.public.id;
+  const phaseId=r.game.public.phaseId;
+  const seats=[];
+  for(let i=0;i<5;i++){
+   await user(i);const v=await raw('game_command_bodybuilder','get',{roomId});
+   assert.equal(v.game.private.fanaticWolfIds,undefined);
+   seats.push({i,id:v.room.viewerId,role:v.game.private.role});
+   r=await raw('game_command_bodybuilder','confirm',{roomId,gameId,phaseId,requestId:randomUUID()});
+  }
+  assert.equal(r.game.public.phase,'firstNight');
+  const wolf=seats.find(s=>s.role==='wolf')!;
+  for(const s of seats){
+   await user(s.i);r=await raw('game_command_bodybuilder','get',{roomId});
+   assert.deepEqual(r.game.private.fanaticWolfIds,s.role==='fanatic'?[wolf.id]:undefined);
+   assert.equal(r.game.public.fanaticWolfIds,undefined);
+   if(s.role==='wolf')assert.deepEqual(r.game.wolves.memberIds,[wolf.id]);
+  }
+  await user(2);
+  for(const s of seats.filter(s=>s.role==='villager'||s.role==='madman')){
+   r=await raw('game_command_bodybuilder','remove',{roomId,gameId,phaseId:r.game.public.phaseId,requestId:randomUUID(),targetId:s.id});
+  }
+  assert.equal(r.game.public.winner,'wolves');
+  for(const s of seats.filter(s=>s.role==='fanatic'||s.role==='madman')) assert.equal(r.game.public.scores.find((score:any)=>score.playerId===s.id).victory,6);
+  await db.exec('reset role');
+  try {
+   await db.exec(`create or replace function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(case when n=4 then '00000003' else repeat('00',n) end,'hex')$$`);
+   const {comp}=(await db.query<{comp:any}>(`select app_private.random_composition(5,'["madman","fanatic"]','{}') comp`)).rows[0]!;
+   assert.equal(comp.madman,1);
+   assert.equal(comp.fanatic,1);
+  } finally {
+   await db.exec(`create or replace function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(repeat('00',n),'hex')$$`);
+  }
+ });
  await db.exec('reset role');
  await t.test('パンあり・なし・旧データの未設定値・初夜・通常朝の表示を保持',async()=>{
   const roomId=(await db.query<{room_id:string}>('select room_id from app_private.games limit 1')).rows[0]!.room_id;

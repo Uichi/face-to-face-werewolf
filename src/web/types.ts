@@ -13,6 +13,7 @@ export type Room = {
   thiefRole?: boolean;
   bodybuilderRole?: boolean;
   shishimaiRole?: boolean;
+  fanaticRole?: boolean;
   randomShishimai?: boolean;
   randomWeights?: RandomWeights;
   doctorRole?: boolean;
@@ -23,4 +24,4 @@ export type Room = {
   victoryPoints?: VictoryPoints;
   customComposition: boolean; members: Member[];
 };
-export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人', lover: '恋人', baker: 'パン屋', thief: '怪盗', hunter: '狩人', doctor: '医者', bodybuilder: 'ボディービルダー', shishimai: '獅子舞' } as const;
+export const roleNames = { villager: '村人', wolf: '人狼', seer: '占い師', medium: '霊媒師', knight: '騎士', madman: '狂人', lover: '恋人', baker: 'パン屋', thief: '怪盗', hunter: '狩人', doctor: '医者', bodybuilder: 'ボディービルダー', shishimai: '獅子舞', fanatic: '狂信者' } as const;

@@ -1,14 +1,14 @@
 // Server-only rules. Never serialize this module's full input state to clients.
-export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai';
+export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic';
 export type Team = 'village' | 'wolves';
-export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number; shishimai?: number };
+export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number; shishimai?: number; fanatic?: number };
 export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean; wolfbound?: boolean; initialWolfbound?: boolean };
 export type Choice = { actorId: string; targetId: string };
 export type AttackChoice = Choice & { strength?: 1 | 2 | 3 };
 // Production callers must supply a cryptographically secure uniform integer source.
 export type RandomIndex = (exclusiveMax: number) => number;
 
-export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor', 'bodybuilder', 'shishimai'];
+export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor', 'bodybuilder', 'shishimai', 'fanatic'];
 export const DEFAULT_COMPOSITIONS: Readonly<Record<number, Readonly<Composition>>> = Object.freeze({
   5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
   6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
@@ -39,7 +39,7 @@ export function validateComposition(count: number, composition: Composition): vo
   requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、人間（狂人を含む）より少なくしてください');
   requireRule(composition.lover === 0 || composition.lover === 2, '恋人は0人か2人で設定してください');
   requireRule((composition.doctor ?? 0) <= 2, '医者は0〜2人です');
-  requireRule(['seer', 'medium', 'knight', 'madman', 'baker', 'thief', 'hunter', 'bodybuilder', 'shishimai'].every(role => (composition[role as Role] ?? 0) <= 1), '占い師・霊媒師・騎士・狂人・パン屋・怪盗・狩人・ボディービルダー・獅子舞は各0〜1人です');
+  requireRule(['seer', 'medium', 'knight', 'madman', 'baker', 'thief', 'hunter', 'bodybuilder', 'shishimai', 'fanatic'].every(role => (composition[role as Role] ?? 0) <= 1), '占い師・霊媒師・騎士・狂人・パン屋・怪盗・狩人・ボディービルダー・獅子舞・狂信者は各0〜1人です');
 }
 
 export function assignRoles(ids: readonly string[], composition: Composition, random: RandomIndex): Player[] {
@@ -53,7 +53,7 @@ export function assignRoles(ids: readonly string[], composition: Composition, ra
   });
 }
 
-export function teamOf(role: Role): Team { return role === 'wolf' || role === 'madman' ? 'wolves' : 'village'; }
+export function teamOf(role: Role): Team { return role === 'wolf' || role === 'madman' || role === 'fanatic' ? 'wolves' : 'village'; }
 
 export function getWinner(players: readonly Player[]): Team | null {
   const alive = players.filter(p => p.alive);

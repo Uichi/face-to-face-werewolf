@@ -37,6 +37,7 @@ const roleDetails: Record<Role, string> = {
  medium: 'あなたは村側です。処刑された人が人狼かどうかを、処刑後に確認できます。',
  lover: 'あなたは村側の恋人です。もう1人の恋人を確認できます。片方が処刑・襲撃・途中退場で脱落すると、もう片方も後追いで脱落します。夜は確認だけ行います。',
  baker: 'あなたは村側のパン屋です。初夜と毎晩、届けるパンを選びます。襲撃された夜のパンは届きません。あなたの名前は公開されません。',
+ fanatic: 'あなたは人狼側の人間です。初夜から人狼の名前が分かります。人狼にあなたの正体は通知されません。襲撃には参加せず、夜は確認だけ行います。占い・霊媒では人狼ではないと出ます。',
  madman: 'あなたは人狼側の人間です。会話で人狼を助けましょう。人狼が誰かは分からず、人狼にもあなたの正体は分かりません。占い・霊媒では人狼ではないと出ます。夜は確認だけ行います。人数判定では人間として数えます。',
  knight: 'あなたは村側です。夜に自分以外の1人を護衛します。連続護衛できるかは部屋の設定に従います。',
  thief: 'あなたは村側です。役職確認中に自分以外の1人を選び、その人の役職・陣営・能力・勝利条件を奪います。結果は最初の夜に確認できます。',
@@ -172,6 +173,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
      {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">{priv.confirmed&&<div hidden={flipping}>{selectionCard}</div>}{thiefMotion&&priv.thiefExchange?.targetId?<ThiefExchangeCards thiefName="あなた" targetName={name(priv.thiefExchange.targetId)+'さん'} stolenRole={priv.thiefExchange.stolenRole} animate privateView onComplete={finishThief}/>:<RoleRevealCard role={priv.role} animate={flipping} highlight={enduranceGlow} onComplete={finishReveal}/>}<div hidden={flipping||thiefMotion}><span className="role-team">{priv.role==='shishimai'?'第三陣営':teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
        {priv.loverId&&<div className="secret-box"><strong>あなたの恋人</strong><p>{name(priv.loverId)}さん</p></div>}
        {priv.thiefExchange?.targetId&&<div className="secret-box thief-result"><strong>怪盗の交換結果</strong><p><b>{name(priv.thiefExchange.targetId)}さん</b>の「{roleNames[priv.thiefExchange.stolenRole]}」を奪いました。</p><p>あなたの現在の役職は<strong>{roleNames[priv.thiefExchange.stolenRole]}</strong>です。</p></div>}
+       {priv.fanaticWolfIds && <div className="secret-box"><strong>あなたが知っている人狼</strong><p>{priv.fanaticWolfIds.map(name).join('、') || '該当者はいません。'}</p><small>この一覧はあなたにだけ表示されます。</small></div>}
        {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p><small>仲間が誰を希望したかは表示されません。</small></div>}
        {role==='bodybuilder'&&priv.endurance&&<div className="secret-box" role="status"><strong>襲撃への耐久：{priv.endurance.used?'使用済み':'未使用（残り1回）'}</strong>{priv.endurance.used&&<p>{priv.endurance.day}日目の夜、筋肉で襲撃に耐えました。次の襲撃には耐えられません。</p>}</div>}
        {priv.blessingReceived && <div className="secret-box" role="status">獅子舞から福を授かりました。</div>}

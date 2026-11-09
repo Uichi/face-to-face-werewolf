@@ -448,7 +448,7 @@ export function viewFor(game: Game, viewerId: string) {
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
     players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true } : {}) })),
-    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length] as const).filter(([role, count]) => role !== 'shishimai' || count > 0)),
+    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length] as const).filter(([role, count]) => (role !== 'shishimai' && role !== 'fanatic') || count > 0)),
     compositionMode: game.randomCandidates ? 'random' as const : undefined,
     randomCandidates: game.randomCandidates ? [...game.randomCandidates] : undefined,
     fixedWolves: game.randomCandidates ? game.players.filter(p=>(p.initialRole??p.role)==='wolf').length : undefined,
@@ -480,6 +480,9 @@ export function viewFor(game: Game, viewerId: string) {
       lastGuardTargetId: shownRole(viewer) === 'knight' ? game.lastGuardTargets[viewerId] ?? null : null,
       attackStrength: game.attackStrengths[viewerId] ?? null,
       endurance: shownRole(viewer)==='bodybuilder'?{used:viewer.role==='bodybuilder'&&Object.hasOwn(game.enduranceUsed??{},viewerId), day:viewer.role==='bodybuilder'?game.enduranceUsed?.[viewerId]??null:null}:null,
+      fanaticWolfIds: shownRole(viewer) === 'fanatic' && game.phase !== 'roles'
+        ? game.players.filter(p => (viewer.decoy ? p.initialRole : p.role) === 'wolf').map(p => p.id)
+        : null,
       blessingReceived: (game.blessings ?? []).includes(viewerId),
       blessing: shownRole(viewer) === 'shishimai' ? {
         deliveredIds: [...((viewer.decoy ? game.decoyBlessings : game.blessings) ?? [])],

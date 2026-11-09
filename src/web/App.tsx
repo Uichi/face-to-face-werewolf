@@ -27,7 +27,7 @@ const LAST_ROOM = 'werewolf.last-room';
 const REQUEST = 'werewolf.create-request';
 const names = ['あなた', 'あおい', 'はる', 'みなと', 'ひなた'];
 const demoRoom = (): Room => ({ id: 'preview', code: 'A7C92F4B10', hostId: 'p0', viewerId: 'p0', status: 'waiting', revision: 1,
-  plannedPlayers: null, loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, randomShishimai: true, randomWeights: {}, randomComposition: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
+  plannedPlayers: null, loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, fanaticRole: true, randomShishimai: true, randomWeights: {}, randomComposition: true, consecutiveGuard: true, wolfboundEnabled: false, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 3, composition: { ...DEFAULT_COMPOSITIONS[5]! }, customComposition: false,
   members: names.map((nickname, i) => ({ id: `p${i}`, nickname, connected: true })) });
 function readSaved(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function save(key: string, value: string | null) { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* The auth layer reports storage failures. */ } }
@@ -161,10 +161,10 @@ export default function App() {
       if (preview) setRoom({ ...room, plannedPlayers:plannedPlayers??null, compositionMode, randomCandidates, randomWeights, fixedWolves: DEFAULT_COMPOSITIONS[plannedPlayers??room.members.length]?.wolf, composition: compositionMode==='random' ? null : composition ?? { ...DEFAULT_COMPOSITIONS[plannedPlayers??room.members.length]! }, customComposition: composition !== null, discussionMinutes, victoryPoints, consecutiveGuard, wolfboundEnabled, revision: room.revision + 1 });
       else {
         // Older servers accept six roles; hide the new role until migration 011 is available.
-        const supported = ([role]: [string, unknown]) => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole) && (role !== 'shishimai' || room.shishimaiRole);
+        const supported = ([role]: [string, unknown]) => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole) && (role !== 'shishimai' || room.shishimaiRole) && (role !== 'fanatic' || room.fanaticRole);
         const compPayload = composition ? Object.fromEntries(Object.entries(composition).filter(supported)) : composition;
         const pointsPayload = victoryPoints ? Object.fromEntries(Object.entries(victoryPoints).filter(supported)) : victoryPoints;
-        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, ...(room.plannedPlayers!==undefined?{plannedPlayers:plannedPlayers??null}:{}), composition: compPayload, discussionMinutes, ...(room.randomComposition ? {compositionMode, randomCandidates: randomCandidates.filter(role => role !== 'shishimai' || room.randomShishimai)} : {}), ...(room.randomWeights !== undefined && randomWeights !== undefined ? { randomWeights } : {}), ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
+        const updated = await lobby('settings', { roomId: room.id, revision: room.revision, ...(room.plannedPlayers!==undefined?{plannedPlayers:plannedPlayers??null}:{}), composition: compPayload, discussionMinutes, ...(room.randomComposition ? {compositionMode, randomCandidates: randomCandidates.filter(role => (role !== 'shishimai' || room.randomShishimai) && (role !== 'fanatic' || room.fanaticRole))} : {}), ...(room.randomWeights !== undefined && randomWeights !== undefined ? { randomWeights } : {}), ...(pointsPayload ? { victoryPoints: pointsPayload } : {}), ...(room.consecutiveGuard !== undefined ? { consecutiveGuard } : {}), ...(room.wolfboundEnabled !== undefined ? { wolfboundEnabled } : {}) });
         setRoom(current => current?.id === updated.id && current.revision <= updated.revision ? updated : current);
       }
       setNotice(preview ? 'プレビューの設定を変更しました。' : '設定を保存しました。'); return true;
@@ -261,7 +261,7 @@ export default function App() {
         <section className="promise"><Moon small/><p>ひみつはスマホに。会話は、この場で。</p><span>インストールも、専任の司会者もいりません。</span></section>
       </>}
     </main>
-    {rulesOpen && <RulesHelp settings={room ? { compositionMode: room.compositionMode, randomCandidates: room.randomCandidates, fixedWolves: room.fixedWolves, composition: room.composition, discussionMinutes: room.discussionMinutes, victoryPoints: room.victoryPoints, loverRole: room.loverRole, thiefRole: room.thiefRole, hunterRole: room.hunterRole, doctorRole: room.doctorRole, bodybuilderRole: room.bodybuilderRole, shishimaiRole: room.shishimaiRole, consecutiveGuard: room.consecutiveGuard, wolfboundEnabled: room.wolfboundEnabled } : undefined} onClose={() => setRulesOpen(false)}/>}
+    {rulesOpen && <RulesHelp settings={room ? { compositionMode: room.compositionMode, randomCandidates: room.randomCandidates, fixedWolves: room.fixedWolves, composition: room.composition, discussionMinutes: room.discussionMinutes, victoryPoints: room.victoryPoints, loverRole: room.loverRole, thiefRole: room.thiefRole, hunterRole: room.hunterRole, doctorRole: room.doctorRole, bodybuilderRole: room.bodybuilderRole, shishimaiRole: room.shishimaiRole, fanaticRole: room.fanaticRole, consecutiveGuard: room.consecutiveGuard, wolfboundEnabled: room.wolfboundEnabled } : undefined} onClose={() => setRulesOpen(false)}/>}
     <footer><span>夜のよりあい</span><span>友だちと囲む、小さな推理の時間。</span><small>開発中 · {room ? room.status === 'waiting' ? '待機室' : 'ゲーム' : 'はじめの一歩'}</small></footer>
   </div>;
 }
@@ -279,14 +279,14 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   const [consecutiveGuard, setConsecutiveGuard] = useState(room.consecutiveGuard ?? true);
   const [wolfboundEnabled, setWolfboundEnabled] = useState(room.wolfboundEnabled ?? false);
   const [randomMode, setRandomMode] = useState(room.compositionMode === 'random');
-  const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai)));
+  const [candidates, setCandidates] = useState<Role[]>(room.randomCandidates ?? RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai)&&(role!=='fanatic'||room.fanaticRole)));
   const [randomWeights, setRandomWeights] = useState<RandomWeights>(room.randomWeights ?? {});
   const selectedWeights = Object.fromEntries(Object.entries(randomWeights).filter(([role, weight]) =>
-    candidates.includes(role as Role) && weight !== 'normal' && (role !== 'shishimai' || room.randomShishimai)));
+    candidates.includes(role as Role) && weight !== 'normal' && (role !== 'shishimai' || room.randomShishimai) && (role !== 'fanatic' || room.fanaticRole)));
   const [custom, setCustom] = useState(room.customComposition);
   const [planned, setPlanned] = useState<number|null>(room.plannedPlayers??null);
   const [draft, setDraft] = useState<Composition>(()=>initialLobbyComposition(room));
-  const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole) && (role !== 'shishimai' || room.shishimaiRole));
+  const availableRoles = (Object.keys(roleNames) as Role[]).filter(role => (role !== 'lover' || room.loverRole) && (role !== 'baker' || room.bakerRole) && (role !== 'thief' || room.thiefRole) && (role !== 'hunter' || room.hunterRole) && (role !== 'doctor' || room.doctorRole) && (role !== 'bodybuilder' || room.bodybuilderRole) && (role !== 'shishimai' || room.shishimaiRole) && (role !== 'fanatic' || room.fanaticRole));
   const isHost = room.viewerId === room.hostId;
   const count = room.members.length;
   const settingsCount=planned??count;
@@ -308,7 +308,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
   useEffect(() => { let active = true; void QRCode.toDataURL(invite, { margin: 2, width: 180, color: { dark: '#182d26', light: '#ffffff' } }).then(image => { if (active) setQr(image); }); return () => { active = false; }; }, [invite]);
   useEffect(() => {
     const changed=previousSettingsKey.current!==settingsKey || previousRoom.current!==room.id;
-    if(changed) { setPlanned(room.plannedPlayers??null); setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomWeights(room.randomWeights ?? {}); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai))); setCustom(room.customComposition); setDraft(initialLobbyComposition(room)); }
+    if(changed) { setPlanned(room.plannedPlayers??null); setPointsDraft({ ...DEFAULT_VICTORY_POINTS, ...room.victoryPoints }); setEditing(false); setMinutes(room.discussionMinutes); setConsecutiveGuard(room.consecutiveGuard ?? true); setWolfboundEnabled(room.wolfboundEnabled ?? false); setRandomWeights(room.randomWeights ?? {}); setRandomMode(room.compositionMode==='random'); setCandidates(room.randomCandidates??RANDOM_ROLES.filter(role=>(role!=='doctor'||room.doctorRole)&&(role!=='bodybuilder'||room.bodybuilderRole)&&(role!=='shishimai'||room.randomShishimai)&&(role!=='fanatic'||room.fanaticRole))); setCustom(room.customComposition); setDraft(initialLobbyComposition(room)); }
     else if(planned===null && previousCount.current!==count) {
       const before=previousCount.current;setDraft(value=>resizeLobbyComposition(value,before,count));
     }
@@ -336,7 +336,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       if(favorite.mode==='random'&&!room.randomComposition)throw new Error('この部屋ではランダム配役を使えません');
       const value = adaptFavorite(favorite, settingsCount, availableRoles);
       setRandomWeights(value.randomWeights ?? {});
-      setRandomMode(value.mode==='random'); setCandidates(value.randomCandidates??RANDOM_ROLES.filter(role=>availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai)));
+      setRandomMode(value.mode==='random'); setCandidates(value.randomCandidates??RANDOM_ROLES.filter(role=>availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai) && (role !== 'fanatic' || room.fanaticRole)));
       setCustom(value.composition !== null); setDraft(value.composition ?? { ...DEFAULT_COMPOSITIONS[settingsCount]! });
       setMinutes(value.minutes); setPointsDraft(value.points); setConsecutiveGuard(value.consecutiveGuard); setWolfboundEnabled(value.wolfboundEnabled);
       onNotice('お気に入り設定を呼び出しました。内容を確認して部屋に反映してください。');
@@ -362,7 +362,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
         {room.consecutiveGuard !== undefined && <div className="setting-line"><span>騎士の連続護衛</span><strong>{room.consecutiveGuard ? 'あり' : 'なし'}</strong></div>}
         {room.wolfboundEnabled !== undefined && <div className="setting-line"><span>狼憑き</span><strong>{room.wolfboundEnabled ? '50%で0〜1人' : '使用しない'}</strong></div>}
-        {room.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 人狼{room.fixedWolves??DEFAULT_COMPOSITIONS[settingsCount]?.wolf??'—'}人固定 · 候補：{room.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}<div className="role-grid">{availableRoles.map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦', '♡', '🥖', '♢', '⌖', '✚', '💪', '✿'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
+        {room.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 人狼{room.fixedWolves??DEFAULT_COMPOSITIONS[settingsCount]?.wolf??'—'}人固定 · 候補：{room.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}<div className="role-grid">{availableRoles.map((role, index) => <div key={role} className={role === 'wolf' || role === 'madman' || role === 'fanatic' ? 'wolf-role' : ''}><span className="role-symbol">{['◇', '◈', '✧', '☽', '♜', '✦', '♡', '🥖', '♢', '⌖', '✚', '💪', '✿', '✦'][index]}</span><span>{roleNames[role]}</span><b>{room.composition ? room.composition[role] ?? 0 : '—'}</b></div>)}</div>
         {room.loverRole && (room.composition?.lover ?? 0) > 0 && <p className="inline-note">恋人は村側の2人組です。片方が脱落すると、もう片方も後追いで脱落します。</p>}
         {!room.composition && room.compositionMode!=='random' && <p className="small-note">5人集まると、おすすめの配役が表示されます。</p>}
         {room.customComposition && <p className="inline-note">カスタム配役です。おすすめと異なる配役のバランスは保証されません。</p>}
@@ -381,7 +381,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
           {randomMode && <fieldset><legend>抽選候補</legend>
             <p className="small-note">人狼は{DEFAULT_COMPOSITIONS[settingsCount]?.wolf ?? '—'}人固定。村人を1人以上残します。候補なしなら人狼と村人だけです。人数は終了まで秘密です。</p>
             {room.randomWeights !== undefined && <p className="small-note">候補ごとに出やすさを選べます。実際の出現率は参加人数と他の候補で変わります。</p>}
-            {RANDOM_ROLES.filter(role => availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai)).map(role => (
+            {RANDOM_ROLES.filter(role => availableRoles.includes(role) && (role !== 'shishimai' || room.randomShishimai) && (role !== 'fanatic' || room.fanaticRole)).map(role => (
               <div className="random-candidate-row" key={role}>
                 <label className="check-label"><input type="checkbox" checked={candidates.includes(role)} onChange={e => setCandidates(e.target.checked ? [...candidates, role] : candidates.filter(item => item !== role))}/>{roleNames[role]}{role === 'lover' ? '（2人セット）' : ''}</label>
                 {room.randomWeights !== undefined && <select aria-label={`${roleNames[role]}の出やすさ`} disabled={!candidates.includes(role)}
