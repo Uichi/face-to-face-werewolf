@@ -12,6 +12,13 @@ import { Scoreboard } from './Points.tsx';
 import { roleNames } from './types.ts';
 import PublicLog from './PublicLog.tsx';
 
+const attackReasonLabels = {
+  guard: '騎士の護衛',
+  doctor: '医者の注射',
+  endurance: 'ボディービルダーの耐久',
+  injection: '2回目の注射による死亡',
+} as const;
+
 export default function GameResult({ game, room, personalNotice, children }: { game: GameView['public']; room: Room; personalNotice?: GameView['personalNotice']; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }, [game.id]);
@@ -36,6 +43,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
   const explanations=Object.fromEntries((game.scores??[]).map(score=>{const player=game.players.find(p=>p.id===score.playerId);return [score.playerId,explainScore(score,player?.role,player?.role?winners.some(p=>p.id===player.id):undefined)];}));
   const exchange = publicThiefReveal(game);
   const ending = game.ending;
+  const failedAttacks = game.phase === 'finished' ? game.failedAttacks ?? [] : [];
   const lastPlayer = ending && game.players.find(p => p.id === ending.playerId);
   const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : ending?.cause === 'injection' ? '2回目の注射を受けたため死亡しました' : ending?.cause === 'shot' ? '狩人に撃たれました' : '途中脱落しました';
   const finalVotes = ending?.cause === 'execution' && game.voteResult?.executedId === ending.playerId
@@ -92,7 +100,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       {selfScore&&<div className="your-score-review"><div><span>あなたの今回の得点</span><strong>＋{selfScore.total}<small>点</small></strong></div><div className="your-score-parts"><span>勝利 ＋{selfScore.victory}</span><span>生存 ＋{selfScore.survival}</span><span>貢献 ＋{selfScore.contribution}</span></div>{selfStanding&&<p>この部屋の累計 <b>{selfStanding.points}点</b> · <b>{selfStanding.rank}位</b></p>}</div>}
       {game.scores&&<div className="review-leaders"><span>累計1位{leaders.length>1?'（同率）':''}</span><p>{leaders.map(member=>member.nickname).join('、')}</p><small>{leaders[0]?.points??0}点 · 同点は同順位、入室順に表示</small></div>}
       <div className="review-next-game"><h4>次の一戦へ</h4><p>同じメンバー・設定・累計ポイントを引き継いで待機室に戻れます。役職は次の試合で配り直します。</p>{children}</div>
-      <nav className="review-navigation" aria-label="振り返りの項目"><a href="#match-review-timeline">日ごとの出来事</a>{game.scores&&<a href="#match-review-scores">順位・得点の理由</a>}{drawnRoles.length > 0 && <a href="#match-review-draw">開始時の抽選配役</a>}<a href="#match-review-roles">最終役職</a></nav>
+      <nav className="review-navigation" aria-label="振り返りの項目"><a href="#match-review-timeline">日ごとの出来事</a>{failedAttacks.length > 0 && <a href="#match-review-attacks">襲撃が失敗した理由</a>}{game.scores&&<a href="#match-review-scores">順位・得点の理由</a>}{drawnRoles.length > 0 && <a href="#match-review-draw">開始時の抽選配役</a>}<a href="#match-review-roles">最終役職</a></nav>
     </section>
     {drawnRoles.length > 0 && <section id="match-review-draw" aria-labelledby="drawn-roles-title">
       <h3 id="drawn-roles-title">抽選で決まった開始時の配役</h3>
@@ -107,6 +115,18 @@ export default function GameResult({ game, room, personalNotice, children }: { g
     <div id="match-review-timeline">{game.publicLog?.length?<PublicLog events={game.publicLog} room={room} grouped finalVote={finalVotes!==null&&ending?{playerId:ending.playerId,day:ending.day,count:finalVotes}:undefined}/>:<p className="review-empty">この試合の公開ログは記録されていません。最後の出来事は上の結果をご確認ください。</p>}
       {game.removals.length>0&&<section className="review-removals"><h3>途中退場の記録</h3>{game.removals.map(removal=><p key={`${removal.playerId}-${removal.day}`}>{removal.day}日目：{name(removal.playerId)}さんが途中退場しました。</p>)}</section>}
     </div>
+    {failedAttacks.length > 0 && <section id="match-review-attacks" aria-labelledby="attack-review-title">
+      <h3 id="attack-review-title">襲撃が失敗した理由</h3>
+      <ol className="failed-attack-list">
+        {failedAttacks.map(({day, targetId, reasons}) => <li key={day}>
+          <span className="section-number">{day}日目の夜</span>
+          <strong>人狼が{name(targetId)}さんを襲撃</strong>
+          <p>{reasons.includes('injection')
+            ? '対象は2回目の注射で死亡し、襲撃による死亡にはなりませんでした。'
+            : `${reasons.map(reason => attackReasonLabels[reason]).join('と')}で襲撃を防ぎました。`}</p>
+        </li>)}
+      </ol>
+    </section>}
     {game.scores?<section id="match-review-scores" className="review-scores"><p className="review-caption">累計ポイントの順位です。「得点の理由を見る」で、今回の内訳と採点条件を確認できます。</p><Scoreboard room={room} scores={game.scores} explanations={explanations}/></section>:<p className="review-empty">この試合の得点内訳は記録されていません。</p>}
     {exchange&&<section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
     <div className="winning-members"><h3>勝ったメンバー</h3><p>勝利陣営のメンバーは、脱落していても勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}{p.id === shishimaiWinner ? ' · 獅子舞の追加勝利' : ''}</li>)}</ul></div>

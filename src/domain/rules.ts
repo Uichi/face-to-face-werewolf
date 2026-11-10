@@ -3,6 +3,8 @@ export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman'
 export type Team = 'village' | 'wolves';
 export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number; shishimai?: number; fanatic?: number };
 export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean; wolfbound?: boolean; initialWolfbound?: boolean };
+export type AttackBlockReason = 'guard' | 'doctor' | 'endurance' | 'injection';
+export type FailedAttack = { day: number; targetId: string; reasons: AttackBlockReason[] };
 export type Choice = { actorId: string; targetId: string };
 export type AttackChoice = Choice & { strength?: 1 | 2 | 3 };
 // Production callers must supply a cryptographically secure uniform integer source.
@@ -141,6 +143,13 @@ export function resolveNight(players: readonly Player[], actions: NightActions, 
   const protectedByDoctor = injected.has(attackedId) && !overdoses.includes(attackedId);
   const enduranceSavedId = alive.some(p=>p.id===attackedId&&p.role==='bodybuilder') && !Object.hasOwn(actions.enduranceUsed??{},attackedId) && protectedPlayer?.id!==attackedId && !protectedByDoctor && !overdoses.includes(attackedId) ? attackedId : null;
   const victimId = enduranceSavedId || protectedPlayer?.id === attackedId || protectedByDoctor || overdoses.includes(attackedId) ? null : attackedId;
+  const attackBlockReasons: AttackBlockReason[] = [];
+  if (overdoses.includes(attackedId)) attackBlockReasons.push('injection');
+  else {
+    if (protectedPlayer?.id === attackedId) attackBlockReasons.push('guard');
+    if (protectedByDoctor) attackBlockReasons.push('doctor');
+    if (enduranceSavedId) attackBlockReasons.push('endurance');
+  }
   const direct = alive.filter(p=>p.id===victimId || overdoses.includes(p.id));
   const directIds=new Set(direct.map(p=>p.id));
   const followed = direct.find(p=>p.role==='lover') ? alive.filter(p=>p.role==='lover'&&!directIds.has(p.id)).map(p=>p.id) : [];
@@ -150,7 +159,7 @@ export function resolveNight(players: readonly Player[], actions: NightActions, 
   const knightSuccess = protectedPlayer?.id===attackedId && nextPlayers.some(p=>p.id===attackedId&&p.alive);
   // The caller must filter this private result by recipient and life status.
   const divination = divined ? { seerId: actions.divination!.actorId, targetId: divined.id, isWolf: divined.role === 'wolf' || divined.wolfbound === true } : null;
-  return { players: nextPlayers, victimId, followedIds: deaths.find(d=>d.cause==='attack')?.followedIds ?? [], deaths, injectionCounts, doctorSuccessIds, knightSuccess, enduranceSavedId, divination, winner: getWinner(nextPlayers) };
+  return { players: nextPlayers, victimId, attackedId, attackBlockReasons, followedIds: deaths.find(d=>d.cause==='attack')?.followedIds ?? [], deaths, injectionCounts, doctorSuccessIds, knightSuccess, enduranceSavedId, divination, winner: getWinner(nextPlayers) };
 }
 
 export function eliminate(players: readonly Player[], targetId: string, reason: 'execution' | 'disconnect' | 'attack' | 'shot' | 'injection') {

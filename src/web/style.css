@@ -725,3 +725,15 @@ footer small { margin-left: auto; font-size: 12px; }
 .drawn-role-cards img { max-width: 100%; }
 .drawn-role-cards li > span { color: var(--muted); }
 .result-role-label > small { display: block; margin-top: 3px; font-weight: 400; }
+
+.failed-attack-list { list-style: none; display: grid; gap: 10px; padding: 0; }
+.failed-attack-list li {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  overflow-wrap: anywhere;
+}
+.failed-attack-list p { margin: 0; }

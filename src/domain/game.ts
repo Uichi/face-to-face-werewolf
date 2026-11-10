@@ -1,6 +1,6 @@
 // Trusted server state. Clients must receive viewFor(), never Game directly.
 import { assignRoles, eliminate, getWinner, NO_EXECUTION_ID, resolveNight, resolveVote, roles, teamOf } from './rules.ts';
-import type { Composition, Player, RandomIndex, Team, VoteResult } from './rules.ts';
+import type { Composition, FailedAttack, Player, RandomIndex, Team, VoteResult } from './rules.ts';
 
 import { DEFAULT_VICTORY_POINTS, validateVictoryPoints, recordPoint, calculateScores } from './scoring.ts';
 import type { VictoryPoints, Scoring, Score } from './scoring.ts';
@@ -48,6 +48,7 @@ export type Game = {
   injectionCounts?: Record<string,number>;
   injectionHistory?: {actorId:string;targetId:string;day:number}[];
   nightDeaths?: Elimination[];
+  failedAttacks?: FailedAttack[];
   randomCandidates?: import('./rules.ts').Role[];
   hunterPending?: { actorId: string; resume: 'execution' | 'morning'; day: number; breadChoice?: string; bakerId?: string };
   secrets: Secret[]; removals: { playerId: string; day: number }[];
@@ -260,6 +261,9 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       protection: knight ? actionOf(knight) : null,
       injections: living.filter(p=>p.role==='doctor').map(actionOf), injectionCounts: game.injectionCounts, enduranceUsed: game.enduranceUsed,
     }, random);
+    if (result.attackBlockReasons.length) {
+      (game.failedAttacks ??= []).push({ day: game.day, targetId: result.attackedId, reasons: result.attackBlockReasons });
+    }
     if (result.divination?.isWolf && living.find(player => player.id === result.divination!.targetId)?.role === 'wolf') recordPoint(game.scoring, result.divination.seerId, 'contribution', result.divination.targetId);
     if (knight && result.knightSuccess) recordPoint(game.scoring, knight.id, 'contribution');
     for(const id of result.doctorSuccessIds)recordPoint(game.scoring,id,'contribution');
@@ -443,6 +447,7 @@ export function viewFor(game: Game, viewerId: string) {
     })() : null,
     resultConfirmation: false,
     hunter: game.hunterPending ? { actorId: game.hunterPending.actorId, day: game.hunterPending.day } : null,
+    ...(isFinished ? { failedAttacks: structuredClone(game.failedAttacks ?? []) } : {}),
     shishimaiWinnerId: isFinished ? shishimaiWinner(game) : null,
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,

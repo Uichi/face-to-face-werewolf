@@ -161,6 +161,29 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
   }
  });
  await db.exec('reset role');
+ await t.test('襲撃失敗の理由は終了後だけ公開し、重複した護衛と注射を記録する',async()=>{
+  const {state}=(await db.query<{state:any}>('select state from app_private.games limit 1')).rows[0]!;
+  const players=state.players.slice(0,5).map((p:any,i:number)=>({...p,alive:true,role:['wolf','knight','doctor','villager','villager'][i]}));
+  const [wolf,knight,doctor,target]=players;
+  const night={...state,players,phase:'night',day:2,confirmed:players.map((p:any)=>p.id),
+   selections:{[wolf.id]:target.id,[knight.id]:target.id,[doctor.id]:target.id},
+   attackStrengths:{[wolf.id]:2},injectionCounts:{},failedAttacks:[]};
+  const {settled}=(await db.query<{settled:any}>(
+   'select app_private.bodybuilder_settle($1::jsonb,100) settled',[JSON.stringify(night)],
+  )).rows[0]!;
+  assert.equal(settled.phase,'morning');
+  assert.deepEqual(settled.failedAttacks,[{day:2,targetId:target.id,reasons:['guard','doctor']}]);
+  const resultFor=async(g:object,id:string)=>(await db.query<{r:any}>(
+   'select app_private.bodybuilder_view($1::jsonb,$2) r',[JSON.stringify(g),id],
+  )).rows[0]!.r;
+  for(const player of players){
+   const during=await resultFor(settled,player.id);
+   assert.equal(Object.hasOwn(during.public,'failedAttacks'),false);
+   assert.equal(Object.hasOwn(during.private,'failedAttacks'),false);
+   const after=await resultFor({...settled,phase:'finished'},player.id);
+   assert.deepEqual(after.public.failedAttacks,settled.failedAttacks);
+  }
+ });
  await t.test('パンあり・なし・旧データの未設定値・初夜・通常朝の表示を保持',async()=>{
   const roomId=(await db.query<{room_id:string}>('select room_id from app_private.games limit 1')).rows[0]!.room_id;
   const original=(await db.query<{state:any}>('select state from app_private.games where room_id=$1',[roomId])).rows[0]!.state;
