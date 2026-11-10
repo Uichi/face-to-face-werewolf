@@ -68,3 +68,21 @@ test('狩人の照準は公開発動、発砲の金色演出は確定した公�
  assert.deepEqual(resultFrames(next,next,name),[]);
  next.publicLog=[{id:'cancel',kind:'shotCancelled',day:1,reason:'操作不能'}];assert.ok(resultFrames(old,next,name).every(f=>f.hunterEffect!=='shot'));
 });
+
+test('初夜と通常の夜の配達だけ動画のあとにパンを表示し、同じ配達を再生しない', () => {
+ const base = snapshot();
+ const breadDelivery = { day: 0, breadType: 'croissant' as const };
+ const firstNight = { ...base, phase: 'firstNight' as const, phaseId: 1, publicLog: [] };
+ const discussion = { ...firstNight, phase: 'discussion' as const, phaseId: 2, day: 1, breadDelivery };
+ assert.deepEqual(resultFrames(firstNight, discussion, name).map(f => f.kind), ['dawn', 'breadVideo', 'bread']);
+ assert.deepEqual(resultFrames(discussion, discussion, name), []);
+ const night = { ...base, phase: 'night' as const, phaseId: 3, publicLog: [] };
+ const morning = { ...night, phase: 'morning' as const, phaseId: 4, publicLog: [
+  { id: 'delivery', day: 1, kind: 'bread' as const, breadType: 'melonpan' as const },
+ ] };
+ const frames = resultFrames(night, morning, name);
+ assert.deepEqual(frames.map(f => f.kind), ['dawn', 'breadVideo', 'bread']);
+ assert.equal(frames.at(-1)?.breadType, 'melonpan');
+ assert.deepEqual(resultFrames(morning, morning, name), []);
+ assert.deepEqual(resultFrames(night, { ...morning, publicLog: [] }, name).map(f => f.kind), ['dawn']);
+});

@@ -737,3 +737,14 @@ footer small { margin-left: auto; font-size: 12px; }
   overflow-wrap: anywhere;
 }
 .failed-attack-list p { margin: 0; }
+
+.bread-delivery-video {
+  display: block;
+  width: 100%;
+  max-height: min(48dvh, 380px);
+  margin: 12px auto;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #121511;
+}
+.scene-bread .bread-image { display: block; max-width: 100%; margin: 12px auto; }

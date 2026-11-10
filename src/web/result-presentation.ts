@@ -1,15 +1,28 @@
 import { publicThiefReveal } from './thief-reveal.ts';
 import type { ThiefReveal } from './thief-reveal.ts';
 import type { GameView } from './game-api.ts';
-import type { PublicLogEvent } from '../domain/game.ts';
-export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; hunterEffect?: 'ready' | 'shot' };
+import { breadNames } from './action-choice.ts';
+import type { BreadType, PublicLogEvent } from '../domain/game.ts';
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief' | 'breadVideo' | 'bread'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; breadType?: BreadType; hunterEffect?: 'ready' | 'shot' };
 type PublicGame = GameView['public'];
+function breadFrames(id: string, breadType: BreadType): ResultFrame[] {
+  return [
+    { id: `${id}:video`, kind: 'breadVideo', title: 'パン屋からのお届け', detail: '', duration: 7000, label: 'パンの配達' },
+    { id, kind: 'bread', title: `${breadNames[breadType]}が届きました`, detail: '', duration: 3500, label: 'パンの配達', breadType },
+  ];
+}
 // Only public snapshots enter presentation; roles and private actions are never read.
 export function resultFrames(previous: PublicGame, current: PublicGame, name: (id: string) => string): ResultFrame[] {
   if (previous.id !== current.id) return [];
   if (previous.phaseId !== current.phaseId && previous.phase !== current.phase) {
     if (['firstNight','night'].includes(current.phase)) return [{id:'dusk',kind:'dusk',title:'夜へ',detail:'',duration:1250}];
-    if (previous.phase === 'firstNight' && current.phase === 'discussion') return [{id:'dawn',kind:'dawn',title:'朝へ',detail:'',duration:1250}];
+    if (previous.phase === 'firstNight' && current.phase === 'discussion') {
+      const bread = current.breadDelivery;
+      return [
+        {id:'dawn',kind:'dawn',title:'朝へ',detail:'',duration:1250},
+        ...(bread?.day === 0 ? breadFrames('first-night-bread', bread.breadType) : []),
+      ];
+    }
   }
   if (!['execution','morning','hunter','finished'].includes(current.phase)) return [];
   const seen = new Set((previous.publicLog ?? []).map(e => e.id));
@@ -40,6 +53,7 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
     if (event.kind === 'noExecution' || event.kind === 'noVictim') frames.push({id:event.id,kind:'notice',title:event.kind === 'noExecution' ? '誰も処刑されませんでした' : '襲撃による犠牲者はいませんでした',detail:event.kind === 'noVictim' ? '犠牲者が出なかった理由は公開されません。' : '投票の結果、処刑はありません。',duration:3500,label:event.kind === 'noExecution' ? '投票結果' : '襲撃結果',day:event.day});
     if (event.kind === 'execution' || event.kind === 'shot') follow(event);
     if (event.kind === 'hunterReady') frames.push({id:event.id,kind:'notice',title:`${id ? name(id) : '狩人'}さんは狩人でした`,detail:'最後の発砲を行います。勝敗はまだ確定していません。',duration:4000,label:'狩人の能力',day:event.day,hunterEffect:'ready'});
+    if (event.kind === 'bread' && event.breadType) frames.push(...breadFrames(event.id, event.breadType));
     if (event.kind === 'shotCancelled') frames.push({id:event.id,kind:'notice',title:'狩人の発砲を中止しました',detail:event.reason ?? '',duration:3500,label:'狩人の発砲',day:event.day});
   }
   if (!nightFollowed) events.filter(e => ['attack','injection'].includes(e.kind)).forEach(follow);
@@ -50,6 +64,9 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
 
 // An explicit solo-only replay starts at the latest vote or night, not the whole match.
 export function latestResultFrames(current: PublicGame, name: (id: string) => string): ResultFrame[] {
+  if (current.phase === 'discussion' && current.day === 1 && current.breadDelivery?.day === 0) {
+    return breadFrames('first-night-bread', current.breadDelivery.breadType);
+  }
   const events = current.publicLog ?? [];
   const direct = ['execution','noExecution','attack','injection','noVictim'];
   let start = events.findLastIndex(e => direct.includes(e.kind));
