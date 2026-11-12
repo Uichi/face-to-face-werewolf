@@ -174,7 +174,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        aria-pressed={selected} aria-busy={submitting || undefined} disabled={controlsDisabled || blocked}
        onClick={() => void send('select', { targetId: id, ...(night && role === 'wolf' ? { strength: wolfStrength } : {}) })}>
        <span className="target-name">{label}</span>
-       {(blocked || selected || submitting) && <span className="target-status">{submitting ? '送信中…' : blocked ? '前夜に護衛' : '選択中'}</span>}
+       {(blocked || selected || submitting) && <span className="target-status">{selected && !submitting && !blocked && <span className="target-check" aria-hidden="true">✓</span>}{submitting ? '送信中…' : blocked ? '前夜に護衛' : '選択中'}</span>}
      </button>;
    })}
  </div>;
@@ -220,7 +220,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
            return <button key={p.id} className={`target-button ${selected?'selected':''}`} aria-pressed={selected}
              disabled={busy || !!pending || offline} onClick={() => void send('select', {
                targetId: JSON.stringify(selected ? blessingIds.filter(id => id !== p.id) : full ? [p.id] : [...blessingIds, p.id]),
-             })}><span className="target-name">{name(p.id)}</span>{selected && <span className="target-status">選択中</span>}</button>;
+             })}><span className="target-name">{name(p.id)}</span>{selected && <span className="target-status"><span className="target-check" aria-hidden="true">✓</span>選択中</span>}</button>;
          })}
        </div> : <p>生存者には全員に配り終えました。夜の確認を完了してください。</p>)}
        {role==='doctor' &&<div className="secret-box"><strong>自分の注射履歴</strong><p>誰からでも、試合中に2回注射されると死亡します。他の医者の行動や対象の累計回数は分かりません。</p>{priv.injectionHistory?.map((h,i)=><p key={i}>{h.day}日目：{h.targetId==='__no_injection__'?'注射しない':`${name(h.targetId)}さんに注射`}</p>)}</div>}
