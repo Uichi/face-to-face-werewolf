@@ -25,7 +25,7 @@ export function currentTask(s: TaskState): { title: string; detail: string; wait
     case 'discussion': return task('みんなで話し合いましょう', '時間になると自動で投票へ進みます。');
     case 'vote':
     case 'runoff': return s.selected
-      ? task('投票を確定してください', '選んだだけでは投票は完了しません。「この投票を確定」を押してください。')
+      ? task('投票を確定してください', '選んだだけでは投票は完了しません。一覧の下のボタンで確定してください。')
       : task(s.phase === 'runoff' ? '決選投票の相手を選んでください' : '投票する相手を選んでください', '相手を選んだあと、確定ボタンを押します。');
     case 'night': return task('夜の操作を完了してください', '「あなただけの情報」を開き、中の案内に沿って確認・確定してください。');
     case 'execution': return task('処刑の結果を確認してください', '下の結果を読んで「結果を確認しました」を押すと、全員の確認後に夜へ進みます。');

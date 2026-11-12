@@ -14,7 +14,7 @@ export function actionChoice(phase: Phase, role: Role | undefined, selection: st
     selected = none ? '「誰も処刑しない」に投票します' : `${person}に投票します`;
     accepted = none ? '「誰も処刑しない」に投票済みです' : `${person}に投票済みです`;
     question = none ? '「誰も処刑しない」への投票を確定しますか？' : `${person}への投票を確定しますか？`;
-    button = 'この投票を確定';
+    button = none ? '処刑しない票を確定' : 'この人に投票する';
   } else if (phase === 'hunter') {
     selected = `${person}を撃ちます`; accepted = `${person}への発砲を確定しました`; question = `${person}を撃ちますか？`; button = 'この人への発砲を確定';
   } else if (phase === 'roles' && role === 'thief') {
@@ -30,7 +30,7 @@ export function actionChoice(phase: Phase, role: Role | undefined, selection: st
     } else if (role === 'seer') {
       selected = `${person}を占います`; accepted = `${person}を占う選択を確定しました`; question = `${person}を占いますか？`; button = 'この占い先を確定';
     } else if (role === 'knight') {
-      selected = `${person}を護衛します`; accepted = `${person}を護衛する選択を確定しました`; question = `${person}を護衛しますか？`; button = 'この護衛先を確定';
+      selected = `${person}を護衛します`; accepted = `${person}を護衛する選択を確定しました`; question = `${person}を護衛しますか？`; button = '護衛を確定';
     } else if (role === 'doctor') {
       const skip = selection === '__no_injection__';
       selected = skip ? '今夜は注射しません' : `${person}に注射します`;

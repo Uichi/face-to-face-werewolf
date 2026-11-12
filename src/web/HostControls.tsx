@@ -20,13 +20,13 @@ export default function HostControls({ game, seconds, disabled, hostAlive, name,
   return <section className="panel host-controls" aria-labelledby="host-controls-title">
     <div className="panel-heading"><h2 id="host-controls-title">主催者の進行</h2><span>あなたが主催者です</span></div>
     {!hostAlive && <p className="host-eliminated-note">脱落後も、主催者として進行操作を行えます。</p>}
-    <p className="host-instruction">{instruction}</p>
     {(automatic || result && game.resultConfirmation) && <div className="host-progress"><span>全体の操作完了</span><strong>{game.completedCount} / {game.requiredCount}人</strong><progress value={game.completedCount} max={game.requiredCount}/></div>}
     <div className="host-actions">
       {phase === 'discussion' && <button className="primary host-main-action" disabled={disabled} onClick={() => onAction('startVote')}>投票を始める<span>議論を終了して、投票画面へ進みます</span></button>}
       {result && !game.resultConfirmation && <button className="primary host-main-action" disabled={disabled} onClick={() => onAction('next')}>{nextLabel}<span>{phase === 'execution' ? '全員の画面を夜へ進めます' : '全員の画面を昼へ進め、議論タイマーを開始します'}</span></button>}
       {canExtend && <button className="secondary-button" disabled={disabled} onClick={() => onAction('extend')}>残り時間を60秒延長</button>}
     </div>
+    <p className="host-instruction">{instruction}</p>
     {seconds === 0 && ['vote', 'runoff', 'night', 'hunter'].includes(phase) && <p className="inline-note">時間は終了しています。操作は引き続き受け付けています。必要なら延長してください。</p>}
     <details className="host-troubleshooting"><summary>トラブル対応</summary>
       {phase === 'hunter' && seconds === 0 && <div className="host-cancel-shot"><h3>狩人が発砲できないとき</h3><p>発砲を中止して、勝敗判定と次の段階へ進められます。</p><button className="secondary-button" disabled={disabled} onClick={() => onConfirm('狩人の発砲を中止しますか？ 発砲せずに勝敗判定と次の段階へ進みます。', 'cancelShot')}>発砲を中止する</button></div>}

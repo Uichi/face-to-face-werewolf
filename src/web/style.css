@@ -154,8 +154,9 @@ footer small { margin-left: auto; font-size: 12px; }
 .room-code { color: var(--gold-bright); font-size: 22px; font-family: ui-monospace,monospace; font-weight: 600; letter-spacing: .07em; margin: 8px 0 22px; white-space: nowrap; }
 .copy-button { width: 100%; display: flex; justify-content: space-between; gap: 8px; }
 .invite-url { font-size: 12px; padding: 9px; margin-top: 8px; min-height: 44px; color: var(--muted); }
-.start-area { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 6px; }
-.start-area small { display: block; color: var(--muted); font-size: 12px; line-height: 1.8; margin-top: 12px; }
+.lobby-start { margin: 0 0 16px; }
+.lobby-start p { margin: 10px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.lobby-start p:first-child { margin-top: 0; }
 .lobby-bottom { display: flex; justify-content: center; gap: 13px; align-items: center; margin: 28px 0 34px; color: var(--muted); }
 .lobby-bottom>span { font-size: 28px; color: var(--gold); }
 .lobby-bottom p, .lobby-bottom small { font-size: 13px; line-height: 1.8; }
@@ -748,3 +749,10 @@ footer small { margin-left: auto; font-size: 12px; }
   background: #121511;
 }
 .scene-bread .bread-image { display: block; max-width: 100%; margin: 12px auto; }
+
+.target-button .target-name { flex: 1; min-width: 0; color: inherit; font-size: inherit; overflow-wrap: anywhere; }
+.target-button .target-status { text-align: right; }
+.host-main-action + .secondary-button { width: 100%; }
+@media (max-width: 600px) {
+  .player-targets { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}

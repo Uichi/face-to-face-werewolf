@@ -351,8 +351,25 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
     try { await navigator.clipboard.writeText(invite); onNotice(preview ? 'プレビュー用のリンクをコピーしました。' : '招待リンクをコピーしました。'); }
     catch { onNotice('リンクを長押ししてコピーしてください。'); }
   }
+  const startBlockedReason = preview ? 'プレビューではゲームを開始できません。'
+    : busy ? '準備しています…'
+    : syncing ? '接続が戻ると開始できます。'
+    : count < 5 ? `開始まであと${5 - count}人必要です。`
+    : rosterMismatch ? `予定は${room.plannedPlayers}人、現在は${count}人です。人数がそろうか、設定を変更すると開始できます。`
+    : editing ? '設定を保存するか、編集を閉じると開始できます。'
+    : currentError ? `配役を確認してください。${currentError}`
+    : !room.composition && room.compositionMode !== 'random' ? '配役を設定すると開始できます。'
+    : null;
   return <div className="lobby">
     <div className="lobby-title"><div><div className="section-number">THE GATHERING</div><h1>今夜の待ち合わせ。</h1><p className="muted">みんなが集まるまで、ひと息。</p></div><span className={`status-pill ${syncing ? 'offline' : ''}`}><span className="dot"/>{preview ? 'プレビュー' : syncing ? '再接続を待っています' : '参加を受付中'}</span></div>
+    <div className="panel lobby-start">
+      {isHost ? <>
+        <button className="primary" disabled={startBlockedReason !== null} aria-describedby="lobby-start-status" onClick={() => void onStart()}>
+          {busy ? '準備しています…' : 'ゲームを始める'}
+        </button>
+        <p id="lobby-start-status" role="status">{startBlockedReason ?? '開始後は新しい参加者が入れなくなります。'}</p>
+      </> : <p role="status">{host?.nickname ?? '主催者'}さんの開始を待っています。</p>}
+    </div>
     <div className="lobby-grid"><div className="lobby-main">
       <section className="panel"><p className="planned-roster" role="status">{plannedRosterMessage(room.plannedPlayers,count)}</p><div className="panel-heading"><h2>集まった仲間</h2><span><b>{count}</b> / 13人</span></div><div className="members">
         {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span>{isHost && !preview && member.id !== room.viewerId && <button className="member-remove" disabled={busy} aria-label={`${member.nickname}さんを待機室から削除`} onClick={() => void onMember('remove', member.id)}>削除</button>}</div>)}
@@ -406,7 +423,6 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
       <span className="code-label">{preview ? '部屋コードの見本' : '部屋コード'}</span><div className="room-code">{room.code.slice(0, 5)}<span> </span>{room.code.slice(5)}</div>
       {!preview && new URL(invite).protocol === 'http:' && <p className="inline-note">接続テスト中です。スマホをこのパソコンと同じWi-Fiにつないでから読み取ってください。</p>}
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
-      <div className="start-area"><p>{isHost ? 'あなたが今夜の主催者です。' : `主催者は ${host?.nickname ?? '確認中'} さんです。`}</p><button className="primary" disabled={preview || busy || editing || rosterMismatch || !isHost || count < 5 || (!room.composition && room.compositionMode!=='random') || Boolean(currentError)} onClick={() => void onStart()}>{busy ? '準備しています…' : isHost ? 'ゲームを開始する' : '主催者の開始を待っています'}</button><small>{preview ? 'プレビューではゲームを開始できません。' : rosterMismatch ? '予定人数と参加人数が違います。設定で現在の人数に合わせるか、全員の参加を待ってください。' : editing ? '設定を部屋に反映するか、編集を閉じてから開始してください。' : '全員そろったら開始しましょう。開始後の新規参加はできません。'}</small></div>
     </aside></div>
     {!preview && <div className="leave-area"><button className="secondary-button" disabled={busy} onClick={() => void onMember('leave')}>部屋から退出する</button><p>退出すると参加者一覧から名前が消えます。招待コードで再参加できます。</p></div>}
     <div className="lobby-bottom"><span>◌</span><p>画面を閉じても、同じブラウザから席に戻れます。<br/><small>接続が切れても、すぐに脱落することはありません。</small></p></div>

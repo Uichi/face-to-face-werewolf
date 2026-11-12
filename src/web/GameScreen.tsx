@@ -157,12 +157,28 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    const animate=first&&!exchangeFirst&&!reduced;
    setFlipping(animate);setRevealed(true);if(!animate)setRoleSeen(true);
  };
- const selector = <div className="target-grid" role="group" aria-label={vote?'投票先':'能力の対象'}>{candidates.map(p=>{const blocked=p.id===blockedGuardId;return <button key={p.id} className={`target-button ${priv?.selection===p.id?'selected':''}`} aria-pressed={priv?.selection===p.id} disabled={busy||!!pending||offline||blocked} onClick={()=>void send('select',{targetId:p.id,...(night&&role==='wolf'?{strength:wolfStrength}:{})})}>{name(p.id)}<span>{blocked?'前夜に護衛':priv?.selection===p.id?'選択中':'選ぶ'}</span></button>})}{night&&role==='doctor'&&<button className={`target-button ${priv?.selection==='__no_injection__'?'selected':''}`} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:'__no_injection__'})} aria-pressed={priv?.selection==='__no_injection__'}>注射しない<span>{priv?.selection==='__no_injection__'?'選択中':'選ぶ'}</span></button>}{canVoteNoExecution&&<button className={`target-button no-execution ${priv?.selection===NO_EXECUTION_ID?'selected':''}`} aria-pressed={priv?.selection===NO_EXECUTION_ID} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:NO_EXECUTION_ID})}>誰も処刑しない<span>{priv?.selection===NO_EXECUTION_ID?'選択中':'選ぶ'}</span></button>}</div>;
+ const controlsDisabled = busy || !!pending || offline;
+ const targetOptions = [
+   ...candidates.map(p => ({ id: p.id, label: name(p.id), blocked: p.id === blockedGuardId })),
+   ...(night && role === 'doctor' ? [{ id: '__no_injection__', label: '注射しない', blocked: false }] : []),
+   ...(canVoteNoExecution ? [{ id: NO_EXECUTION_ID, label: '誰も処刑しない', blocked: false }] : []),
+ ];
+ const selector = <div className="target-grid player-targets" role="group" aria-label={vote ? '投票先' : '能力の対象'}>
+   {targetOptions.map(({ id, label, blocked }) => {
+     const selected = priv?.selection === id;
+     return <button key={id} className={`target-button ${selected ? 'selected' : ''} ${id === NO_EXECUTION_ID ? 'no-execution' : ''}`}
+       aria-pressed={selected} disabled={controlsDisabled || blocked}
+       onClick={() => void send('select', { targetId: id, ...(night && role === 'wolf' ? { strength: wolfStrength } : {}) })}>
+       <span className="target-name">{label}</span>
+       {(blocked || selected) && <span className="target-status">{blocked ? '前夜に護衛' : '選択中'}</span>}
+     </button>;
+   })}
+ </div>;
  const breadSelector = <div className="target-grid bread-selector" role="group" aria-label="届けるパン">{BREAD_TYPES.map(type=><button key={type} className={`target-button ${priv?.selection===type?'selected':''}`} aria-pressed={priv?.selection===type} disabled={busy||!!pending||offline} onClick={()=>void send('select',{targetId:type})}><BreadImage type={type} compact/>{breadNames[type]}<span>{priv?.selection===type?'選択中':'選ぶ'}</span></button>)}</div>;
  const confirmButton = <button className="primary" disabled={busy||!!pending||offline||!!priv?.confirmed||((hunterShot||vote||thiefChoice||(night&&ability)||breadChoice||(blessingNight&&blessingCandidates.length>0))&&!choice)||(phase==='roles'&&!roleSeen)} onClick={()=> {
    if(choice) setDialog({text:choice.question,action:'confirm'});
    else void send('confirm');
- }}>{busy?'送信中…':priv?.confirmed?'確定済み・みんなを待っています':choice?.button??(hunterShot?'この人への発砲を確定':vote?'この投票を確定':breadChoice?'このパンを焼く':night&&ability?'この対象で確定':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了')}</button>;
+ }}>{priv?.confirmed?'確定済み・みんなを待っています':busy?'送信中…':pending?'送信結果を確認中':offline?'再接続を待っています':choice?.button??(hunterShot?'この人への発砲を確定':vote?'投票先を選んでください':breadChoice?'このパンを焼く':night&&ability?'行動の対象を選んでください':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了')}</button>;
 
  return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
    <div className="game-top" key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1>{phaseNames[phase]}</h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
@@ -193,14 +209,14 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
          <p>{priv.blessing.deliveredIds.map(name).join('、') || 'まだ配っていません。'}</p>
          <p>{priv.blessing.doubleUsed ? '二人への福配りは使用済みです。' : '今夜は2人まで選べます。2人に配れるのは試合中1回です。'}</p>
        </div>}
-       {blessingNight && !priv.confirmed && (blessingCandidates.length ? <div className="target-grid" role="group" aria-label="福を配る人">
+       {blessingNight && !priv.confirmed && (blessingCandidates.length ? <div className="target-grid player-targets" role="group" aria-label="福を配る人">
          {blessingCandidates.map(p => {
            const selected = blessingIds.includes(p.id);
            const full = blessingIds.length >= (priv.blessing?.doubleUsed ? 1 : 2);
            return <button key={p.id} className={`target-button ${selected?'selected':''}`} aria-pressed={selected}
              disabled={busy || !!pending || offline} onClick={() => void send('select', {
                targetId: JSON.stringify(selected ? blessingIds.filter(id => id !== p.id) : full ? [p.id] : [...blessingIds, p.id]),
-             })}>{name(p.id)}<span>{selected?'選択中':'選ぶ'}</span></button>;
+             })}><span className="target-name">{name(p.id)}</span>{selected && <span className="target-status">選択中</span>}</button>;
          })}
        </div> : <p>生存者には全員に配り終えました。夜の確認を完了してください。</p>)}
        {role==='doctor' &&<div className="secret-box"><strong>自分の注射履歴</strong><p>誰からでも、試合中に2回注射されると死亡します。他の医者の行動や対象の累計回数は分かりません。</p>{priv.injectionHistory?.map((h,i)=><p key={i}>{h.day}日目：{h.targetId==='__no_injection__'?'注射しない':`${name(h.targetId)}さんに注射`}</p>)}</div>}
