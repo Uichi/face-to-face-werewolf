@@ -50,6 +50,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const [error, setError] = useState('');
  const [offline, setOffline] = useState(false);
  const [busy, setBusy] = useState(false);
+ const [sendingTarget, setSendingTarget] = useState<string | null>(null);
  const [revealed, setRevealed] = useState(false);
  const [blessingVideo, setBlessingVideo] = useState(false);
  const [flipping, setFlipping] = useState(false);
@@ -105,11 +106,13 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    const current = gameRef.current;
    const command = retry ?? { action, payload: { roomId: room.id, gameId: current.public.id, phaseId: current.public.phaseId, requestId: requestId(), ...extra } };
    sending.current = true; setBusy(true); setError(''); setDialog(null);
+   setSendingTarget(command.action === 'select' && typeof command.payload.targetId === 'string'
+     ? command.payload.targetId : null);
    if (action !== 'select') setRevealed(false);
    try { apply(await (localDriver ? localDriver.command(command.action, command.payload) : gameCommand(command.action, command.payload))); setPending(null); }
    catch (e) {
      if (active.current) { const strength=gameRef.current?.private?.attackStrength; setWolfStrength(strength===1||strength===2||strength===3?strength:2); setError((e as Error).message); setPending(e instanceof GameError && e.retryable ? command : null); }
-   } finally { sending.current = false; if (active.current) setBusy(false); if (!localDriver) void refresh(); }
+   } finally { sending.current = false; if (active.current) { setBusy(false); setSendingTarget(null); } if (!localDriver) void refresh(); }
  }
  if (!game) return <section className="panel game-loading"><h1>試合に接続しています</h1><p role="status">{error || '少しお待ちください。'}</p><button className="primary" onClick={() => void refresh()}>再接続</button></section>;
  const pub=game.public, priv=game.private;
@@ -166,11 +169,12 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const selector = <div className="target-grid player-targets" role="group" aria-label={vote ? '投票先' : '能力の対象'}>
    {targetOptions.map(({ id, label, blocked }) => {
      const selected = priv?.selection === id;
-     return <button key={id} className={`target-button ${selected ? 'selected' : ''} ${id === NO_EXECUTION_ID ? 'no-execution' : ''}`}
-       aria-pressed={selected} disabled={controlsDisabled || blocked}
+     const submitting = sendingTarget === id;
+     return <button key={id} className={`target-button ${selected ? 'selected' : ''} ${submitting ? 'target-submitting' : ''} ${id === NO_EXECUTION_ID ? 'no-execution' : ''}`}
+       aria-pressed={selected} aria-busy={submitting || undefined} disabled={controlsDisabled || blocked}
        onClick={() => void send('select', { targetId: id, ...(night && role === 'wolf' ? { strength: wolfStrength } : {}) })}>
        <span className="target-name">{label}</span>
-       {(blocked || selected) && <span className="target-status">{blocked ? '前夜に護衛' : '選択中'}</span>}
+       {(blocked || selected || submitting) && <span className="target-status">{submitting ? '送信中…' : blocked ? '前夜に護衛' : '選択中'}</span>}
      </button>;
    })}
  </div>;

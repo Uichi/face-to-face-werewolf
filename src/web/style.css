@@ -756,3 +756,15 @@ footer small { margin-left: auto; font-size: 12px; }
 @media (max-width: 600px) {
   .player-targets { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
+
+button:enabled:active {
+  filter: brightness(.8);
+  box-shadow: inset 0 0 0 2px currentColor;
+  transition: none;
+}
+.target-button.target-submitting:disabled {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--gold);
+}
+.target-submitting .target-status { color: var(--gold-bright); }
