@@ -98,27 +98,50 @@ footer small { margin-left: auto; font-size: 12px; }
 .back { margin-bottom: 20px; }
 .entry-card form { display: grid; gap: 22px; margin-top: 26px; }
 .primary {
-  background: #2b4537;
-  border: 1px solid #b39a62;
-  border-radius: 9px;
+  --button-shape: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+  --button-face: linear-gradient(160deg, #385749, #1d3229);
+  --button-edge: linear-gradient(145deg, #dfc48c, #85704a 55%, #bba06d);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  border: 1px solid transparent;
   color: #fff4dc;
-  padding: 15px 20px;
+  padding: 15px 24px;
   font-size: 15px;
   font-weight: 700;
   min-height: 52px;
   width: 100%;
-  box-shadow: 0 3px 10px #0003, inset 0 1px #fff1;
+}
+.primary::before, .primary::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  clip-path: var(--button-shape);
+}
+.primary::before { z-index: -2; inset: -1px; background: var(--button-edge); }
+.primary::after {
+  z-index: -1;
+  inset: 1px;
+  background:
+    linear-gradient(90deg, transparent, #dfc48c60, transparent) center 5px / 60% 1px no-repeat,
+    linear-gradient(90deg, transparent, #dfc48c45, transparent) center calc(100% - 5px) / 60% 1px no-repeat,
+    var(--button-face);
 }
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
-    background: #365443;
-    border-color: var(--gold-bright);
+    --button-face: linear-gradient(160deg, #436555, #263d31);
+    --button-edge: var(--gold-bright);
   }
 }
 .primary:enabled:active {
-  background: #1e3328;
-  box-shadow: inset 0 2px 4px #0005, inset 0 0 0 1px var(--gold-bright);
+  --button-face: linear-gradient(160deg, #1b3026, #294437);
+  --button-edge: var(--gold-bright);
+  box-shadow: none;
   filter: none;
+  transform: translateY(1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .primary:enabled:active { transform: none; }
 }
 .secondary-button, .copy-button, .rules-trigger, .rules-close, .preset-buttons button { border: 1px solid var(--line-gold); background: var(--surface-raised); color: var(--gold-bright); border-radius: 7px; min-height: 48px; padding: 12px 16px; font-size: 14px; }
 .secondary-button:hover:not(:disabled), .copy-button:hover:not(:disabled), .rules-trigger:hover:not(:disabled), .rules-close:hover:not(:disabled), .preset-buttons button:hover:not(:disabled) { background: #2c3b2e; border-color: var(--gold-bright); }
