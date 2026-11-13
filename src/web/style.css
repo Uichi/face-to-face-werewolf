@@ -846,3 +846,48 @@ button:enabled:active {
   color: var(--gold-bright);
   font-weight: 700;
 }
+
+.vote-heading {
+  background: linear-gradient(114deg, #3c2924 0 48%, #28231f 48.3% 53%, #1a2721 53.3%);
+  border-color: #ab815d;
+}
+.vote-heading h1 {
+  display: inline-block;
+  isolation: isolate;
+  position: relative;
+  padding: 2px 24px 4px 12px;
+  font-size: clamp(30px, 7vw, 46px);
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fff4dc;
+}
+.vote-heading h1::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(120deg, #986143, #663b30);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  animation: vote-banner-in 220ms ease-out both;
+}
+@keyframes vote-banner-in {
+  from { opacity: .55; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.vote-panel .player-targets .target-button {
+  border-inline-start-width: 3px;
+}
+.vote-panel .player-targets .target-button:enabled:active {
+  transform: translateY(1px);
+}
+.vote-panel .player-targets .target-button.selected {
+  border-color: var(--gold-bright);
+}
+.game-screen .vote-panel .action-selection-target {
+  font-size: clamp(18px, 5vw, 23px);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vote-panel .player-targets .target-button:enabled:active { transform: none; }
+}
