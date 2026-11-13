@@ -268,8 +268,8 @@ footer small { margin-left: auto; font-size: 12px; }
 .completion { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 24px; font-size: 14px; }
 .completion progress { width: 100%; height: 9px; accent-color: var(--gold); }
 .complete-note { color: var(--village); }
-.vote-counts, .result-roles { margin-top: 22px; }
-.vote-counts>div, .result-roles>div, .game-players>div { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 15px; min-width: 0; }
+.result-roles>div, .game-players>div { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--line); font-size: 15px; min-width: 0; }
+.result-roles { margin-top: 22px; }
 .result-roles>div span { flex: 1; min-width: 0; }
 .result-roles strong { max-width: 100%; }
 .result-roles small { min-width: 2em; color: var(--muted); }
@@ -349,13 +349,6 @@ footer small { margin-left: auto; font-size: 12px; }
 .result-panel>.primary { width: calc(100% - 56px); margin: 0 28px 28px; }
 .result-panel>.muted { padding: 0 28px 20px; }
 .result-panel>section:not(.victory-summary):not(.public-log), .result-panel>.inline-note { margin: 24px 28px; }
-.final-vote-counts { margin-top: 22px; padding: 18px; background: var(--surface-inset); border: 1px solid var(--line); border-radius: 8px; }
-.final-vote-counts h3 { font-size: 16px; margin: 0 0 8px; }
-.final-vote-counts>div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 8px; border-bottom: 1px solid var(--line); font-size: 15px; }
-.final-vote-counts>div.executed { background: var(--danger-bg); border-left: 3px solid var(--danger-line); }
-.final-vote-counts span { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.final-vote-counts small { font-size: 12px; border: 1px solid var(--danger-line); color: var(--danger); padding: 3px 8px; border-radius: 14px; }
-.game-screen .final-vote-counts>p { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
 .decision-flow { display: grid; justify-items: center; gap: 8px; margin: 24px auto 18px; max-width: 430px; }
 .decision-flow>div { width: 100%; display: grid; gap: 6px; padding: 14px 16px; background: var(--surface-inset); border: 1px solid var(--line); border-radius: 8px; }
 .decision-flow small { font-size: 12px; color: var(--muted); }
@@ -520,7 +513,6 @@ footer small { margin-left: auto; font-size: 12px; }
   .result-panel>.primary { width: calc(100% - 36px); margin: 0 18px 22px; }
   .result-panel>.muted { padding: 0 18px 16px; }
   .result-panel>section:not(.victory-summary):not(.public-log), .result-panel>.inline-note { margin: 24px 18px; }
-  .final-vote-counts { padding: 14px; }
   .decision-flow strong { font-size: 15px; }
   .result-exit { margin: 0 18px 22px; }
   .rules-help-header { padding: 16px 16px 10px; }
@@ -891,3 +883,38 @@ button:enabled:active {
 @media (prefers-reduced-motion: reduce) {
   .vote-panel .player-targets .target-button:enabled:active { transform: none; }
 }
+
+.vote-outcome {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border-inline-start: 4px solid #c68d69;
+  background: linear-gradient(115deg, #4c3027, #2a2420);
+  overflow-wrap: anywhere;
+}
+.game-screen .vote-outcome h2 { margin: 0; }
+.vote-outcome > strong { font-size: clamp(23px, 6vw, 34px); color: var(--gold-bright); }
+.vote-outcome p { margin: 4px 0 0; }
+.vote-tally { margin-top: 22px; text-align: start; }
+.vote-tally ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.vote-tally li {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-inset);
+}
+.vote-tally li.vote-tally-highlight { border-color: var(--gold); }
+.vote-tally-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.vote-tally-row span { min-width: 0; overflow-wrap: anywhere; }
+.vote-tally-row strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.vote-tally-row small { margin-inline-start: 6px; color: var(--gold-bright); white-space: nowrap; }
+.vote-tally-track { height: 5px; margin-top: 6px; background: var(--surface-raised); border-radius: 4px; }
+.vote-tally-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: #b27e60;
+  transform-origin: left;
+  animation: vote-tally-grow 280ms ease-out both;
+}
+.vote-tally-highlight .vote-tally-bar { background: var(--gold); }
+@keyframes vote-tally-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }

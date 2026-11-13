@@ -1,3 +1,4 @@
+import VoteCounts from './VoteCounts.tsx';
 import ThiefExchangeCards from './ThiefExchangeCards.tsx';
 import { publicThiefReveal } from './thief-reveal.ts';
 import { rankedMembers } from './scoreboard.ts';
@@ -7,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { GameView } from './game-api.ts';
 import type { Room } from './types.ts';
-import { teamOf } from '../domain/rules.ts';
+import { NO_EXECUTION_ID, teamOf } from '../domain/rules.ts';
 import { Scoreboard } from './Points.tsx';
 import { roleNames } from './types.ts';
 import PublicLog from './PublicLog.tsx';
@@ -22,7 +23,7 @@ const attackReasonLabels = {
 export default function GameResult({ game, room, personalNotice, children }: { game: GameView['public']; room: Room; personalNotice?: GameView['personalNotice']; children: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }, [game.id]);
-  const name = (id: string) => room.members.find(m => m.id === id)?.nickname ?? '参加者';
+  const name = (id: string) => id === NO_EXECUTION_ID ? '誰も処刑しない' : room.members.find(m => m.id === id)?.nickname ?? '参加者';
   const villageWins = game.winner === 'village';
   const winners = game.players.filter(p => p.role === 'shishimai' ? p.id === game.shishimaiWinnerId : p.role && teamOf(p.role) === game.winner);
   const shishimaiWinner = game.shishimaiWinnerId;
@@ -48,8 +49,6 @@ export default function GameResult({ game, room, personalNotice, children }: { g
   const verb = ending?.cause === 'execution' ? '処刑されました' : ending?.cause === 'attack' ? '人狼に襲撃されました' : ending?.cause === 'injection' ? '2回目の注射を受けたため死亡しました' : ending?.cause === 'shot' ? '狩人に撃たれました' : '途中脱落しました';
   const finalVotes = ending?.cause === 'execution' && game.voteResult?.executedId === ending.playerId
     ? game.voteResult.counts[ending.playerId] ?? 0 : null;
-  const finalVoteRows = finalVotes === null ? [] : Object.entries(game.voteResult!.counts).sort(([aId, a], [bId, b]) =>
-    b - a || room.members.findIndex(member => member.id === aId) - room.members.findIndex(member => member.id === bId));
   const followedNames = ending?.followedIds?.map(name) ?? [];
   const roleLabel = (player: typeof game.players[number], initial = false) => {
     const role = initial ? player.initialRole : player.role;
@@ -86,7 +85,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       {ending.cause === 'attack' && <p className="final-attack-explanation">{name(ending.playerId)}さんは、人狼の襲撃によって犠牲になりました。</p>}
       {ending.followedIds?.length ? <div className="lover-follow-notice final-followed"><strong>恋人の後追いが発生しました</strong>{ending.followedIds.map(id=><p key={id}><strong>{name(id)}</strong>さんは、{name(ending.playerId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div> : null}
       {lastPlayer?.role && <span className="final-role">役職：{roleLabel(lastPlayer)}</span>}
-      {finalVoteRows.length > 0 && <div className="final-vote-counts"><h3>最後の投票結果</h3>{finalVoteRows.map(([id, votes])=><div className={id === ending.playerId ? 'executed' : ''} key={id}><span>{name(id)}{id === ending.playerId && <small>処刑</small>}</span><b>{votes}票</b></div>)}<p>誰が誰に投票したかは公開しません。</p></div>}
+      {finalVotes !== null && game.voteResult && <VoteCounts counts={game.voteResult.counts} name={name} title="最後の投票結果" />}
     </div>}
     <div className="victory-summary">
       <div className="section-number">{ending ? 'これにより、決着' : '試合の結果'}</div>
