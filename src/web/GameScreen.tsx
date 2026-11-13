@@ -126,6 +126,10 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const role=priv?.role;
  const hunterShot=phase==='hunter' && pub.hunter?.actorId===me;
  const vote=phase==='vote'||phase==='runoff';
+ const phaseTone = vote || phase === 'execution' ? 'vote'
+   : phase === 'night' || phase === 'firstNight' ? 'night'
+   : phase === 'morning' ? 'morning'
+   : phase === 'discussion' ? 'day' : undefined;
  const night=phase==='night';
  const resultPhase=phase==='execution'||phase==='morning';
  const voteCounts = pub.voteResult?.counts;
@@ -189,7 +193,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  }}>{priv?.confirmed?'確定済み・みんなを待っています':busy?'送信中…':pending?'送信結果を確認中':offline?'再接続を待っています':choice?.button??(hunterShot?'この人への発砲を確定':vote?'投票先を選んでください':breadChoice?'このパンを焼く':night&&ability?'行動の対象を選んでください':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了')}</button>;
 
  return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
-   <div className={`game-top ${vote ? 'vote-heading' : ''}`} key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1><span>{phaseNames[phase]}</span></h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
+   <div className="game-top" data-phase-tone={phaseTone} key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1><span>{phaseNames[phase]}</span></h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
    {phase!=='finished'&&<aside className={`current-task ${task.waiting?'task-waiting':''}`} aria-live="polite" aria-atomic="true"><span>今やること</span><h2>{task.title}</h2><p>{task.detail}</p></aside>}
    {offline&&<div className="message" role="status">接続を確認しています。操作の結果を確認できるまで、このままお待ちください。</div>}
    {error&&<div className="message error" role="alert">{error}{pending&&<button className="text-button" disabled={busy} onClick={()=>void send(pending.action,{},pending)}>同じ操作を再送する</button>}</div>}
@@ -236,30 +240,29 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {(night||breadChoice||thiefChoice||blessingNight)&&<>{!priv.confirmed&&selectionCard}{confirmButton}</>}
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>
      </div></div>}</section>}
-     <section className={`panel phase-panel ${vote ? 'vote-panel' : ''}`}>{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
+     {(phase !== 'discussion' || (pub.day === 1 && pub.breadDelivery?.day === 0) || pub.compositionMode === 'random') && <section className={`panel phase-panel ${vote ? 'vote-panel' : ''}`}>{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
        {phase==='hunter'&&<><HunterEffect/><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{advice&&<p className="inline-note action-advice">{advice}</p>}{canSelect&&selector}{!priv?.confirmed&&selectionCard}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
-       {phase==='roles'&&<><h2>役職を確認しましょう</h2><p>上の「タップして表示」で自分の役職と必要な操作を確認し、完了してください。</p>{self.alive&&!thiefChoice&&confirmButton}</>}
-       {phase==='firstNight'&&<><h2>最初の夜です</h2><p>今夜は襲撃・護衛・占いはありません。「あなただけの情報」を開いて、役職に応じた操作を完了してください。</p>{self.alive&&!breadChoice&&!blessingNight&&confirmButton}</>}
-       {phase==='discussion'&&<><h2>顔を上げて、話し合おう。</h2>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><BreadImage type={pub.breadDelivery.breadType}/><div><strong>{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}<p>誰が人狼なのか、気になった発言や考えを共有しましょう。時間になると投票へ進みます。</p></>}
+       {phase==='roles'&&<>{self.alive&&!thiefChoice&&confirmButton}</>}
+       {phase==='firstNight'&&<><p>初夜は襲撃・護衛・占いがありません。</p>{self.alive&&!breadChoice&&!blessingNight&&confirmButton}</>}
+       {phase==='discussion'&&<>{pub.day===1&&pub.breadDelivery?.day===0&&<div className="bread-notice delivered" role="status"><BreadImage type={pub.breadDelivery.breadType}/><div><strong>{breadNames[pub.breadDelivery.breadType]}が届きました</strong><p>パン屋が最初の夜に焼いたパンです。パン屋の名前は公開されません。</p></div></div>}</>}
        {vote&&<>{phase === 'runoff' && voteCounts && <div className="vote-outcome">
          <strong>決選投票へ</strong>
          <p>{pub.runoffIds.map(name).join('、')}が{highestVotes}票で同票でした。</p>
-       </div>}<h2>{priv?.confirmed?'投票を受け付けました':phase==='runoff'?'同票の候補者から選んでください':'投票する人を選んでください'}</h2><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{!priv?.confirmed&&selectionCard}{priv?.confirmed&&<p className="complete-note">投票は確定済みです。内容は「あなただけの情報」で確認できます。</p>}{self.alive&&confirmButton}</>}
-       {night&&<><h2>静かに、夜の行動を。</h2><p>生存者全員が「あなただけの情報」を開き、操作を完了してください。能力がない人も確認が必要です。全員が完了すると、残り時間に関係なく朝へ進みます。</p>{priv?.confirmed&&<p className="complete-note">操作は完了しています。みんなを待ちましょう。</p>}</>}
+       </div>}<p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{!priv?.confirmed&&selectionCard}{priv?.confirmed&&<p className="complete-note">投票は確定済みです。内容は「あなただけの情報」で確認できます。</p>}{self.alive&&confirmButton}</>}
        {phase==='execution' && <div className="vote-outcome">
          <h2>{pub.voteResult?.executedId ? `${name(pub.voteResult.executedId)}さんが処刑されました` : '誰も処刑されませんでした'}</h2>
          {pub.voteResult?.executedId || noExecutionWon
            ? <strong>{highestVotes}票</strong>
            : <p>{pub.voteResult ? '同票のため、処刑なしです。' : '処刑された人はいません。'}</p>}
        </div>}
-       {phase==='morning'&&<><h2>朝になりました</h2>{pub.nightDeaths?.filter(d=>d.cause==='injection').map(d=><div className="attack-result-notice has-victim" key={d.playerId}><strong>{name(d.playerId)}さんは2回目の注射を受けたため死亡しました。</strong>{d.followedIds?.map(id=><p key={id}>{name(id)}さんは{name(d.playerId)}さんの恋人だったため後追いしました。</p>)}</div>)}{((pub.composition?.baker??0)>0 || pub.compositionMode==='random' && pub.randomCandidates?.includes('baker'))&&<div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status">{pub.breadDelivered&&pub.breadDelivery?<BreadImage type={pub.breadDelivery.breadType}/>:<span aria-hidden="true">…</span>}<div><strong>{pub.breadDelivered&&pub.breadDelivery?`${breadNames[pub.breadDelivery.breadType]}が届きました`:'今日はパンが届きませんでした'}</strong><p>{pub.compositionMode==='random'?(pub.breadDelivered?'パン屋の名前は公開されません。':'パンが届かなかった理由は公開されません。'):pub.breadDelivered?'パン屋は昨夜を生き延びました。誰なのかは公開されません。':'パン屋はすでに脱落しているか、昨夜の処理で脱落しました。'}</p></div></div>}<div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>襲撃による犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div><p>結果を確認したら、次の議論に進みましょう。</p></>}
+       {phase==='morning'&&<>{pub.nightDeaths?.filter(d=>d.cause==='injection').map(d=><div className="attack-result-notice has-victim" key={d.playerId}><strong>{name(d.playerId)}さんは2回目の注射を受けたため死亡しました。</strong>{d.followedIds?.map(id=><p key={id}>{name(id)}さんは{name(d.playerId)}さんの恋人だったため後追いしました。</p>)}</div>)}{((pub.composition?.baker??0)>0 || pub.compositionMode==='random' && pub.randomCandidates?.includes('baker'))&&<div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status">{pub.breadDelivered&&pub.breadDelivery?<BreadImage type={pub.breadDelivery.breadType}/>:<span aria-hidden="true">…</span>}<div><strong>{pub.breadDelivered&&pub.breadDelivery?`${breadNames[pub.breadDelivery.breadType]}が届きました`:'今日はパンが届きませんでした'}</strong><p>{pub.compositionMode==='random'?(pub.breadDelivered?'パン屋の名前は公開されません。':'パンが届かなかった理由は公開されません。'):pub.breadDelivered?'パン屋は昨夜を生き延びました。誰なのかは公開されません。':'パン屋はすでに脱落しているか、昨夜の処理で脱落しました。'}</p></div></div>}<div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>襲撃による犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div></>}
        {resultPhase&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
        {resultPhase&&pub.resultConfirmation&&<div className="result-confirm"><p>生存者全員の確認で、自動的に次へ進みます。</p>{self.alive&&confirmButton}</div>}
        {(['roles','firstNight','vote','runoff','night'].includes(phase)||(resultPhase&&pub.resultConfirmation))&&<div className="completion"><span>操作完了</span><strong>{pub.completedCount} / {pub.requiredCount}人</strong><progress value={pub.completedCount} max={pub.requiredCount}/></div>}
        {seconds===0&&['vote','runoff','night'].includes(phase)&&<p className="inline-note">時間は終了しましたが、操作は引き続き受け付けています。自動で投票や能力使用はしません。</p>}
        {voteCounts && ['runoff','execution'].includes(phase) && <VoteCounts
          key={pub.phaseId} counts={voteCounts} name={name} runoffIds={phase === 'runoff' ? pub.runoffIds : []} />}
-     </section>
+     </section>}
      {host&&<HostControls game={pub} seconds={seconds} disabled={busy||!!pending||offline} hostAlive={self.alive} name={name} onAction={action=>void send(action)} onConfirm={(text,action,targetId)=>setDialog({text,action,targetId})}/>}
      <PublicLog events={pub.publicLog??[]} room={room}/>
      <section className="panel"><div className="panel-heading"><h2>参加者</h2><span>{alive.length}人生存</span></div><div className="game-players">{pub.players.map(p=><div className={p.alive?'':'eliminated'} key={p.id}><span>{name(p.id)}{p.id===me?'（あなた）':''}</span><small>{p.alive?'生存':'脱落'}</small></div>)}</div></section>

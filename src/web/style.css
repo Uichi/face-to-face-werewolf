@@ -857,30 +857,35 @@ button:enabled:active {
   font-weight: 700;
 }
 
-.vote-heading {
-  background: linear-gradient(114deg, #3c2924 0 48%, #28231f 48.3% 53%, #1a2721 53.3%);
-  border-color: #ab815d;
+.game-top[data-phase-tone] {
+  background: var(--phase-background);
+  border-color: var(--phase-border);
 }
-.vote-heading h1 {
+.game-top[data-phase-tone="vote"] {
+  --phase-background: linear-gradient(114deg, #3c2924 0 48%, #28231f 48.3% 53%, #1a2721 53.3%);
+  --phase-border: #ab815d;
+  --phase-band: linear-gradient(120deg, #986143, #663b30);
+}
+.game-top[data-phase-tone] h1 {
   display: inline-block;
   isolation: isolate;
   position: relative;
   padding: 2px 24px 4px 12px;
-  font-size: clamp(30px, 7vw, 46px);
+  font-size: clamp(25px, 6vw, 46px);
   font-weight: 800;
   line-height: 1.2;
   color: #fff4dc;
 }
-.vote-heading h1::before {
+.game-top[data-phase-tone] h1::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(120deg, #986143, #663b30);
+  background: var(--phase-band);
   clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
-  animation: vote-banner-in 220ms ease-out both;
+  animation: phase-banner-in 220ms ease-out both;
 }
-@keyframes vote-banner-in {
+@keyframes phase-banner-in {
   from { opacity: .55; transform: translateX(-10px); }
   to { opacity: 1; transform: translateX(0); }
 }
@@ -936,3 +941,20 @@ button:enabled:active {
 }
 .vote-tally-highlight .vote-tally-bar { background: var(--gold); }
 @keyframes vote-tally-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.game-top[data-phase-tone="day"] {
+  --phase-background: linear-gradient(114deg, #283b2a 52%, #192b22 52.3%);
+  --phase-border: #7f976d;
+  --phase-band: linear-gradient(120deg, #466044, #2a4936);
+}
+.game-top[data-phase-tone="night"] {
+  --phase-background: linear-gradient(114deg, #242c40 52%, #171e2a 52.3%);
+  --phase-border: #798aaa;
+  --phase-band: linear-gradient(120deg, #455575, #313a59);
+}
+.game-top[data-phase-tone="morning"] {
+  --phase-background: linear-gradient(114deg, #423b29 52%, #272b20 52.3%);
+  --phase-border: #ad945e;
+  --phase-band: linear-gradient(120deg, #775e36, #514728);
+}
+.game-top[data-phase-tone] > div:first-child { flex: 1; min-width: 0; }
