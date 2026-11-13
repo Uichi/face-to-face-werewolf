@@ -55,6 +55,8 @@ export default function App() {
   const [soloTest, setSoloTest] = useState(false);
   const [nickname, setNickname] = useState('');
   const [code, setCode] = useState(inviteCode());
+  const [editInviteCode, setEditInviteCode] = useState(false);
+  const invited = screen === 'join' && /^[A-F0-9]{10}$/.test(inviteCode());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -153,7 +155,7 @@ export default function App() {
     } catch (e) { if (screen === 'create' && e instanceof RoomAccessLostError) save(REQUEST, null); setError((e as Error).message); setToken(''); setCaptchaVersion(v => v + 1); }
     finally { setBusy(false); operation.current = false; }
   }
-  function home() { setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); setSoloTest(false); history.replaceState(null, '', location.pathname); }
+  function home() { setEditInviteCode(false); setRoom(null); setScreen('home'); setError(''); setNotice(''); setPreview(false); setSoloTest(false); history.replaceState(null, '', location.pathname); }
   async function updateSettings(composition: Composition | null, discussionMinutes: number, victoryPoints?: VictoryPoints, consecutiveGuard = true, wolfboundEnabled = false, compositionMode: CompositionMode = composition ? 'custom' : 'standard', randomCandidates: Role[] = RANDOM_ROLES, plannedPlayers?: number | null, randomWeights?: RandomWeights) {
     if (!room || operation.current) return false;
     operation.current = true; setBusy(true); setError(''); setNotice('');
@@ -247,9 +249,13 @@ export default function App() {
           </section>
         </div> : <section className="entry-card">
           <button className="text-button back" onClick={home}>← トップへ</button><div className="section-number">{screen === 'create' ? 'HOST A ROOM' : 'JOIN YOUR FRIENDS'}</div>
-          <h1>{screen === 'create' ? '今夜の部屋をつくる。' : 'みんなの待つ部屋へ。'}</h1><p className="muted">{screen === 'create' ? 'あなたもプレイヤーとして参加できます。' : '招待コードと、呼ばれたい名前を入力してください。'}</p>
+          <h1>{screen === 'create' ? '部屋をつくる' : '部屋に参加する'}</h1><p className="muted">{screen === 'create' ? 'ニックネームを入力すると、招待リンクを発行できます。' : invited && !editInviteCode ? 'ニックネームを入力して、招待された部屋に参加しましょう。' : '部屋コードとニックネームを入力してください。'}</p>
           <form onSubmit={enterRoom}>
-            {screen === 'join' && <label>部屋コード<input value={code} onChange={e => setCode(e.target.value.replace(/[\s-]/g, '').toUpperCase())} placeholder="A7C92F4B10" required minLength={10} maxLength={10} pattern="[A-Fa-f0-9]{10}" autoCapitalize="characters" autoCorrect="off" spellCheck={false}/></label>}
+            {invited && !editInviteCode && <div className="invited-room">
+              <div><small>招待された部屋</small><strong>{code}</strong></div>
+              <button type="button" className="text-button" onClick={() => setEditInviteCode(true)}>コードを変更</button>
+            </div>}
+            {screen === 'join' && (!invited || editInviteCode) && <label>部屋コード<input value={code} onChange={e => setCode(e.target.value.replace(/[\s-]/g, '').toUpperCase())} placeholder="A7C92F4B10" required minLength={10} maxLength={10} pattern="[A-Fa-f0-9]{10}" autoCapitalize="characters" autoCorrect="off" spellCheck={false}/></label>}
             <label>ニックネーム<input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="例：ゆう" required maxLength={20} autoComplete="nickname"/><small>1〜20文字。同じ部屋では名前を重複できません。</small></label>
             {needsCaptcha && <Turnstile key={captchaVersion} siteKey={captchaSiteKey} onToken={setToken} onError={setError}/>}
             {!configured && <div className="inline-note">ただいま接続の準備中です。待機室のプレビューをお試しいただけます。</div>}
@@ -360,9 +366,15 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
     : currentError ? `配役を確認してください。${currentError}`
     : !room.composition && room.compositionMode !== 'random' ? '配役を設定すると開始できます。'
     : null;
+  const modeLabel = room.compositionMode === 'random' ? 'ランダム' : room.customComposition ? 'カスタム' : '標準';
   return <div className="lobby">
     <div className="lobby-title"><div><div className="section-number">THE GATHERING</div><h1>今夜の待ち合わせ。</h1><p className="muted">みんなが集まるまで、ひと息。</p></div><span className={`status-pill ${syncing ? 'offline' : ''}`}><span className="dot"/>{preview ? 'プレビュー' : syncing ? '再接続を待っています' : '参加を受付中'}</span></div>
     <div className="panel lobby-start">
+      <div className="lobby-overview">
+        <div><small>参加人数</small><strong>{count}{room.plannedPlayers ? ` / ${room.plannedPlayers}` : ''}人</strong></div>
+        <div><small>配役</small><strong>{modeLabel}</strong></div>
+        {isHost && <div className="lobby-shortcuts"><a href="#room-invite">招待する</a><a href="#room-settings">設定を見る</a></div>}
+      </div>
       {isHost ? <>
         <button className="primary" disabled={startBlockedReason !== null} aria-describedby="lobby-start-status" onClick={() => void onStart()}>
           {busy ? '準備しています…' : 'ゲームを始める'}
@@ -375,7 +387,7 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         {room.members.map((member, i) => <div className="member" key={member.id}><div className={`avatar tone-${i % 4}`}>{member.nickname.slice(0, 1)}</div><div><strong>{member.nickname}</strong><small>{member.id === room.hostId ? '主催者' : `プレイヤー ${i + 1}`}{member.id === room.viewerId ? ' · あなた' : ''}</small></div><span className={`connection ${member.connected ? '' : 'away'}`}>{member.connected ? '●' : '○'}<span className="sr-only">{member.connected ? '接続中' : '接続を待っています'}</span></span>{isHost && !preview && member.id !== room.viewerId && <button className="member-remove" disabled={busy} aria-label={`${member.nickname}さんを待機室から削除`} onClick={() => void onMember('remove', member.id)}>削除</button>}</div>)}
         {count < 5 && <div className="empty-seat"><span>＋</span>あと{5 - count}人で、始められる人数になります。</div>}
       </div></section>
-      <section className="panel settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '編集を閉じる'  : '設定を変更'}</button>}</div>
+      <section className="panel settings" id="room-settings"><div className="panel-heading"><h2>今夜のルール</h2>{isHost && <button className="text-button" onClick={() => setEditing(!editing)}>{editing ? '編集を閉じる'  : '設定を変更'}</button>}</div>
         <div className="setting-line"><span>昼の議論</span><strong>{room.discussionMinutes}<small> 分</small></strong></div>
         {room.consecutiveGuard !== undefined && <div className="setting-line"><span>騎士の連続護衛</span><strong>{room.consecutiveGuard ? 'あり' : 'なし'}</strong></div>}
         {room.wolfboundEnabled !== undefined && <div className="setting-line"><span>狼憑き</span><strong>{room.wolfboundEnabled ? '50%で0〜1人' : '使用しない'}</strong></div>}
@@ -418,11 +430,11 @@ function Lobby({ room, preview, busy, syncing, onSave, onNotice, onStart, onMemb
         <div className="rule-footnote">初夜の襲撃なし <span>·</span> 役職は本人だけに表示</div>
       </section>
       {room.victoryPoints && <section className="panel points-panel"><Scoreboard room={room}/><ScoringRules points={room.victoryPoints}/>{isHost && <button className="text-button reset-points" disabled={busy} onClick={() => void onResetPoints()}>全員の累計をリセット</button>}</section>}
-    </div><aside className="invite-panel"><div className="section-number">INVITE YOUR FRIENDS</div><h2>この輪に、招待しよう。</h2><p>近くの仲間にQRコードを見せるか、<br/>部屋コードを伝えてください。</p>
-      <div className="qr-wrap">{qr && <img src={qr} alt={preview ? 'プレビュー用QRコード（実際の招待ではありません）' : '部屋の招待QRコード'} width={180} height={180}/>}</div>
+    </div><aside className="invite-panel" id="room-invite"><h2>仲間を招待</h2><p>招待リンクを送るか、QRコードを読み取ってもらってください。</p>
       <span className="code-label">{preview ? '部屋コードの見本' : '部屋コード'}</span><div className="room-code">{room.code.slice(0, 5)}<span> </span>{room.code.slice(5)}</div>
       {!preview && new URL(invite).protocol === 'http:' && <p className="inline-note">接続テスト中です。スマホをこのパソコンと同じWi-Fiにつないでから読み取ってください。</p>}
       <button className="copy-button" onClick={() => void copy()}>{preview ? 'プレビューリンクをコピー' : '招待リンクをコピー'} <span>↗</span></button><input className="invite-url" aria-label={preview ? 'プレビューリンク' : '招待リンク'} value={invite} readOnly onFocus={e => e.currentTarget.select()}/>
+      <div className="qr-wrap">{qr && <img src={qr} alt={preview ? 'プレビュー用QRコード（実際の招待ではありません）' : '部屋の招待QRコード'} width={180} height={180}/>}</div>
     </aside></div>
     {!preview && <div className="leave-area"><button className="secondary-button" disabled={busy} onClick={() => void onMember('leave')}>部屋から退出する</button><p>退出すると参加者一覧から名前が消えます。招待コードで再参加できます。</p></div>}
     <div className="lobby-bottom"><span>◌</span><p>画面を閉じても、同じブラウザから席に戻れます。<br/><small>接続が切れても、すぐに脱落することはありません。</small></p></div>

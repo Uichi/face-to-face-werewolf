@@ -970,3 +970,22 @@ button:enabled:active {
 .night-action h3 { margin: 0 0 10px; color: #f6dfb2; }
 .night-action .strength-picker { margin-block: 12px; }
 .night-role-help summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
+
+.invited-room, .lobby-overview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 14px;
+  background: var(--surface-inset);
+  border: 1px solid var(--line-gold);
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.invited-room { justify-content: space-between; }
+.invited-room small, .lobby-overview small { display: block; color: var(--muted); }
+.invited-room strong, .lobby-overview strong { overflow-wrap: anywhere; color: var(--gold-bright); }
+.lobby-shortcuts { display: flex; flex-wrap: wrap; column-gap: 14px; margin-inline-start: auto; }
+.lobby-shortcuts a { display: inline-flex; align-items: center; min-height: 44px; }
+#room-invite, #room-settings { scroll-margin-top: 20px; }
+#room-invite .qr-wrap { margin-top: 18px; }
