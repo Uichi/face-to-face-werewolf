@@ -1,3 +1,4 @@
+import { morningEvents } from '../src/web/morning-events.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resultFrames } from '../src/web/result-presentation.ts';
@@ -85,4 +86,22 @@ test('初夜と通常の夜の配達だけ動画のあとにパンを表示し�
  assert.equal(frames.at(-1)?.breadType, 'melonpan');
  assert.deepEqual(resultFrames(morning, morning, name), []);
  assert.deepEqual(resultFrames(night, { ...morning, publicLog: [] }, name).map(f => f.kind), ['dawn']);
+});
+
+test('朝の一覧は前夜の直接死亡・発砲・パンを表示し、昼の発砲を混ぜない', () => {
+ const game: PublicGame = { ...snapshot(), phase: 'morning', day: 2, victimId: null,
+  breadDelivery: { day: 1, breadType: 'croissant' },
+  nightDeaths: [{ day: 1, cause: 'injection', playerId: 'hunter', followedIds: ['lover'] }],
+  publicLog: [
+   { id: 'day-hunter', day: 1, kind: 'hunterReady', playerId: 'other' },
+   { id: 'day-shot', day: 1, kind: 'shot', playerId: 'A' },
+   { id: 'injection', day: 1, kind: 'injection', playerId: 'hunter' },
+   { id: 'night-hunter', day: 1, kind: 'hunterReady', playerId: 'hunter' },
+   { id: 'night-shot', day: 1, kind: 'shot', playerId: 'B' },
+  ],
+ };
+ const rows = morningEvents(game);
+ assert.deepEqual(rows.map(row => row.kind), ['injection', 'noVictim', 'shot', 'bread']);
+ assert.deepEqual(rows[0]?.followedIds, ['lover']);
+ assert.equal(rows[2]?.id, 'night-shot');
 });

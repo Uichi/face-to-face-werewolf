@@ -3,11 +3,11 @@ import { reviewDays } from './match-review.ts';
 import type { BreadType, PublicLogEvent } from '../domain/game.ts';
 import type { Room } from './types.ts';
 
-export default function PublicLog({ events, room, grouped = false, finalVote }: { events: PublicLogEvent[]; room: Room; grouped?: boolean; finalVote?: { playerId: string; day: number; count: number } }) {
+export default function PublicLog({ events, room, grouped = false, morning = false, finalVote }: { events: PublicLogEvent[]; room: Room; grouped?: boolean; morning?: boolean; finalVote?: { playerId: string; day: number; count: number } }) {
   if (!events.length) return null;
   const name = (id?: string) => room.members.find(member => member.id === id)?.nickname ?? '参加者';
   const list = (items: PublicLogEvent[]) => <ol>{items.map(event => <li key={event.id}>
-      <div className="public-log-day">{event.kind === 'bread' && event.day === 0 ? '最初の夜のパン' : `${event.day}日目${event.kind === 'attack' || event.kind === 'noVictim' || event.kind === 'injection' ? 'の夜' : event.kind === 'bread' ? 'のパン' : ['hunterReady','shot','shotCancelled'].includes(event.kind) ? 'の狩人' : 'の投票'}`}</div>
+      <div className="public-log-day">{morning ? ({attack:"人狼の襲撃", injection:"注射", noVictim:"人狼の襲撃", shot:"狩人の発砲", shotCancelled:"狩人の発砲", bread:"パンの配達"} as Partial<Record<PublicLogEvent["kind"],string>>)[event.kind] : event.kind === 'bread' && event.day === 0 ? '最初の夜のパン' : `${event.day}日目${event.kind === 'attack' || event.kind === 'noVictim' || event.kind === 'injection' ? 'の夜' : event.kind === 'bread' ? 'のパン' : ['hunterReady','shot','shotCancelled'].includes(event.kind) ? 'の狩人' : 'の投票'}`}</div>
       {event.kind === 'execution' && <p><strong>{name(event.playerId)}さん</strong>が{finalVote&&finalVote.playerId===event.playerId&&finalVote.day===event.day?`${finalVote.count}票で`:null}処刑されました。</p>}
       {event.kind === 'noExecution' && <p><strong>誰も処刑されませんでした。</strong></p>}
       {event.kind === 'attack' && <p><strong>{name(event.playerId)}さん</strong>が人狼の襲撃で犠牲になりました。</p>}
@@ -19,6 +19,9 @@ export default function PublicLog({ events, room, grouped = false, finalVote }: 
       {event.kind === 'bread' && event.breadType && <p><BreadImage type={event.breadType} compact/><strong>{({shokupan:'食パン',croissant:'クロワッサン',melonpan:'メロンパン',currypan:'カレーパン',anpan:'あんパン',surprise:'おまかせ'} satisfies Record<BreadType,string>)[event.breadType]}</strong>が届きました。</p>}
       {(event.kind==='attack'||event.kind==='injection'?events.filter(e=>e.day===event.day&&(e.kind==='attack'||e.kind==='injection')).at(-1)?.id===event.id?events.filter(e=>e.day===event.day&&(e.kind==='attack'||e.kind==='injection')).flatMap(e=>(e.followedIds??[]).map(id=>({id,source:e.playerId}))):[]:(event.followedIds??[]).map(id=>({id,source:event.playerId}))).map(({id,source}) => <p className="public-log-follow" key={id}><strong>{name(id)}さん</strong>は、{name(source)}さんの恋人だったため後追いしました。</p>)}
     </li>)}</ol>;
+  if (morning) return <section className="public-log morning-log" aria-labelledby="morning-log-title">
+    <h2 id="morning-log-title">昨夜の出来事</h2>{list(events)}
+  </section>;
   return <section className={`panel public-log ${grouped?'review-timeline':''}`} aria-labelledby="public-log-title">
     <div className="panel-heading"><h2 id="public-log-title">{grouped?'日ごとの振り返り':'公開ログ'}</h2><span>古い順</span></div>
     {grouped?<><p className="review-caption">試合中に公開された出来事です。夜の出来事は、その夜が始まった日付にまとめています。</p>{reviewDays(events).map(day=><section className="review-day" key={day.day}><h3>{day.label}</h3>{list(day.events)}</section>)}</>:list(events)}

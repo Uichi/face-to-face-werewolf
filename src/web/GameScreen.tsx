@@ -1,3 +1,4 @@
+import { morningEvents } from './morning-events.ts';
 import VoteCounts from './VoteCounts.tsx';
 import { canChooseNoExecution } from './no-execution-choice.ts';
 import { canHighlightEndurance } from './endurance-highlight.ts';
@@ -136,7 +137,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const highestVotes = Math.max(0, ...Object.values(voteCounts ?? {}));
  const noExecutionWon = !pub.voteResult?.executedId && voteCounts?.[NO_EXECUTION_ID] === highestVotes
    && Object.values(voteCounts ?? {}).filter(count => count === highestVotes).length === 1;
- const directlyEliminatedId=phase==='execution'?pub.voteResult?.executedId:phase==='morning'?pub.victimId:null;
+ const directlyEliminatedId = pub.voteResult?.executedId;
  const task=currentTask({resultConfirmation:pub.resultConfirmation===true,phase,alive:self.alive,confirmed:!!priv?.confirmed,selected:!!priv?.selection,roleSeen,busy,retryPending:!!pending,offline,hunterActor:hunterShot});
  const ability=role && ['wolf','seer','knight','doctor'].includes(role);
  const breadChoice=!!(room.breadChoices||localDriver)&&role==='baker'&&(phase==='firstNight'||phase==='night');
@@ -274,8 +275,12 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
            ? <strong>{highestVotes}票</strong>
            : <p>{pub.voteResult ? '同票のため、処刑なしです。' : '処刑された人はいません。'}</p>}
        </div>}
-       {phase==='morning'&&<>{pub.nightDeaths?.filter(d=>d.cause==='injection').map(d=><div className="attack-result-notice has-victim" key={d.playerId}><strong>{name(d.playerId)}さんは2回目の注射を受けたため死亡しました。</strong>{d.followedIds?.map(id=><p key={id}>{name(id)}さんは{name(d.playerId)}さんの恋人だったため後追いしました。</p>)}</div>)}{((pub.composition?.baker??0)>0 || pub.compositionMode==='random' && pub.randomCandidates?.includes('baker'))&&<div className={`bread-notice ${pub.breadDelivered?'delivered':'missing'}`} role="status">{pub.breadDelivered&&pub.breadDelivery?<BreadImage type={pub.breadDelivery.breadType}/>:<span aria-hidden="true">…</span>}<div><strong>{pub.breadDelivered&&pub.breadDelivery?`${breadNames[pub.breadDelivery.breadType]}が届きました`:'今日はパンが届きませんでした'}</strong><p>{pub.compositionMode==='random'?(pub.breadDelivered?'パン屋の名前は公開されません。':'パンが届かなかった理由は公開されません。'):pub.breadDelivered?'パン屋は昨夜を生き延びました。誰なのかは公開されません。':'パン屋はすでに脱落しているか、昨夜の処理で脱落しました。'}</p></div></div>}<div className={`attack-result-notice ${pub.victimId?'has-victim':'no-victim'}`} role="status"><span>昨夜の襲撃結果</span>{pub.victimId?<><strong>{name(pub.victimId)}さんが犠牲になりました</strong><p>{name(pub.victimId)}さんは、人狼の襲撃によって脱落しました。</p></>:<><strong>襲撃による犠牲者はいませんでした</strong><p>犠牲者が出なかった理由は公開されません。</p></>}</div></>}
-       {resultPhase&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
+       {phase === 'morning' && <>
+         <PublicLog events={morningEvents(pub)} room={room} morning />
+         {!pub.breadDelivered && ((pub.composition?.baker ?? 0) > 0 || pub.compositionMode === 'random' && pub.randomCandidates?.includes('baker')) &&
+           <p className="inline-note">今日はパンが届きませんでした。</p>}
+       </>}
+       {phase==='execution'&&pub.followedIds?.length>0&&<div className="lover-follow-notice" role="status"><strong>恋人の後追いが発生しました</strong>{pub.followedIds.map(id=><p key={id}>{name(id)}さんは、{name(directlyEliminatedId)}さんの<strong>恋人だったため</strong>、後追いで脱落しました。</p>)}</div>}
        {resultPhase&&pub.resultConfirmation&&<div className="result-confirm"><p>生存者全員の確認で、自動的に次へ進みます。</p>{self.alive&&confirmButton}</div>}
        {(['roles','firstNight','vote','runoff','night'].includes(phase)||(resultPhase&&pub.resultConfirmation))&&<div className="completion"><span>操作完了</span><strong>{pub.completedCount} / {pub.requiredCount}人</strong><progress value={pub.completedCount} max={pub.requiredCount}/></div>}
        {seconds===0&&['vote','runoff','night'].includes(phase)&&<p className="inline-note">時間は終了しましたが、操作は引き続き受け付けています。自動で投票や能力使用はしません。</p>}
