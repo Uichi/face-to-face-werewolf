@@ -61,12 +61,26 @@ export default function GameResult({ game, room, personalNotice, children }: { g
         return count > 0 ? [{ role, count }] : [];
       })
     : [];
-  const finalEventText = ending ? `${name(ending.playerId)}さんが${finalVotes === null ? verb : `${finalVotes}票で処刑`}${followedNames.length ? `、恋人の${followedNames.join('さん・')}さんが後追い` : ''}` : '試合終了';
+  const victoryReason = villageWins
+    ? '生存している人狼が0人になり、村側が勝利しました。'
+    : `生存人狼${wolves}人が生存人間${villagers}人と同数以上になり、人狼側が勝利しました。`;
+  const finalCause = finalVotes === null ? verb : `${finalVotes}票で処刑されました`;
+  const victorySummary = ending
+    ? `${name(ending.playerId)}さんが${finalCause}。${followedNames.length ? `${followedNames.join('さん、')}さんが後を追いました。` : ''}${victoryReason}`
+    : victoryReason;
   return <section className={`panel result-panel ${villageWins ? 'village-wins' : 'wolves-win'}`} aria-labelledby="winner-title">
+    <div className="victory-summary">
+      <h2 id="winner-title" ref={heading} tabIndex={-1} aria-describedby="victory-reason">
+        {villageWins ? '村側' : '人狼側'}の勝利！
+      </h2>
+      <p id="victory-reason">{victorySummary}</p>
+      <div className="final-counts"><span>生存人狼 <b>{wolves}人</b></span><span>生存人間 <b>{villagers}人</b></span></div>
+      <p className="your-result">{viewerIsShishimai ? (selfWon ? 'あなたは獅子舞として追加勝利しました' : '獅子舞の追加勝利は達成できませんでした') : selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
+    </div>
     {shishimaiWinner && <div className="shishimai-victory" aria-labelledby="shishimai-victory-title">
       <RoleImage role="shishimai" compact />
       <div>
-        <p className="shishimai-victory-team">{villageWins ? '村側' : '人狼側'}の勝利 ＋ 第三陣営の追加勝利</p>
+        <p className="shishimai-victory-team">第三陣営の追加勝利</p>
         <h3 id="shishimai-victory-title">獅子舞も勝利！</h3>
         <p><strong>{name(shishimaiWinner)}さん{shishimaiWinner === room.viewerId ? '（あなた）' : ''}</strong>が生き残り、自分以外の生存者全員に福を配りました。</p>
       </div>
@@ -87,14 +101,6 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       {lastPlayer?.role && <span className="final-role">役職：{roleLabel(lastPlayer)}</span>}
       {finalVotes !== null && game.voteResult && <VoteCounts counts={game.voteResult.counts} name={name} title="最後の投票結果" />}
     </div>}
-    <div className="victory-summary">
-      <div className="section-number">{ending ? 'これにより、決着' : '試合の結果'}</div>
-      <h2 id="winner-title" ref={heading} tabIndex={-1} aria-describedby={ending ? 'final-event victory-reason' : 'victory-reason'}>{villageWins ? '村側' : '人狼側'}<span>の勝利！</span></h2>
-      {ending && <div className="decision-flow" aria-label="勝敗が決まった流れ"><div><small>最後の出来事</small><strong>{finalEventText}</strong></div><span aria-hidden="true">↓</span><div><small>処理後の人数</small><strong>人狼 {wolves}人 ／ 人間 {villagers}人</strong></div><span aria-hidden="true">↓</span><div className="decision-winner"><small>勝敗判定</small><strong>{villageWins ? '村側' : '人狼側'}の勝利</strong></div></div>}
-      <p id="victory-reason">{villageWins ? '生存している人狼が0人になったため、村側の勝利です。' : `生存人狼${wolves}人が、生存人間${villagers}人と同数以上になったため、人狼側の勝利です。`}</p>
-      <div className="final-counts"><span>生存人狼 <b>{wolves}人</b></span><span>生存人間 <b>{villagers}人</b></span></div>
-      <p className="your-result">{viewerIsShishimai ? (selfWon ? 'あなたは獅子舞として追加勝利しました' : '獅子舞の追加勝利は達成できませんでした') : selfWon ? 'あなたの陣営の勝利です' : 'あなたの陣営は敗北しました'}</p>
-    </div>
     <section className="postgame-hub" aria-labelledby="review-heading"><span className="section-number">ROUND REVIEW</span><h3 id="review-heading">振り返って、もう一戦。</h3>
       {selfScore&&<div className="your-score-review"><div><span>あなたの今回の得点</span><strong>＋{selfScore.total}<small>点</small></strong></div><div className="your-score-parts"><span>勝利 ＋{selfScore.victory}</span><span>生存 ＋{selfScore.survival}</span><span>貢献 ＋{selfScore.contribution}</span></div>{selfStanding&&<p>この部屋の累計 <b>{selfStanding.points}点</b> · <b>{selfStanding.rank}位</b></p>}</div>}
       {game.scores&&<div className="review-leaders"><span>累計1位{leaders.length>1?'（同率）':''}</span><p>{leaders.map(member=>member.nickname).join('、')}</p><small>{leaders[0]?.points??0}点 · 同点は同順位、入室順に表示</small></div>}
