@@ -210,17 +210,27 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
            <button className="secondary-button" onClick={() => setBlessingVideo(false)}>動画をスキップ</button>
          </>}
        </div>}
-       {priv.confirmed&&<div hidden={flipping}>{selectionCard}</div>}{thiefMotion&&priv.thiefExchange?.targetId?<ThiefExchangeCards thiefName="あなた" targetName={name(priv.thiefExchange.targetId)+'さん'} stolenRole={priv.thiefExchange.stolenRole} animate privateView onComplete={finishThief}/>:<RoleRevealCard role={priv.role} animate={flipping} highlight={enduranceGlow} onComplete={finishReveal}/>}<div hidden={flipping||thiefMotion}><span className="role-team">{priv.role==='shishimai'?'第三陣営':teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2><p>{roleDetails[priv.role]}</p>
-       {priv.loverId&&<div className="secret-box"><strong>あなたの恋人</strong><p>{name(priv.loverId)}さん</p></div>}
-       {priv.thiefExchange?.targetId&&<div className="secret-box thief-result"><strong>怪盗の交換結果</strong><p><b>{name(priv.thiefExchange.targetId)}さん</b>の「{roleNames[priv.thiefExchange.stolenRole]}」を奪いました。</p><p>あなたの現在の役職は<strong>{roleNames[priv.thiefExchange.stolenRole]}</strong>です。</p></div>}
-       {priv.fanaticWolfIds && <div className="secret-box"><strong>あなたが知っている人狼</strong><p>{priv.fanaticWolfIds.map(name).join('、') || '該当者はいません。'}</p><small>この一覧はあなたにだけ表示されます。</small></div>}
-       {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p><small>仲間が誰を希望したかは表示されません。</small></div>}
-       {role==='bodybuilder'&&priv.endurance&&<div className="secret-box" role="status"><strong>襲撃への耐久：{priv.endurance.used?'使用済み':'未使用（残り1回）'}</strong>{priv.endurance.used&&<p>{priv.endurance.day}日目の夜、筋肉で襲撃に耐えました。次の襲撃には耐えられません。</p>}</div>}
-       {priv.blessing && <div className="secret-box">
-         <strong>福を配った人</strong>
-         <p>{priv.blessing.deliveredIds.map(name).join('、') || 'まだ配っていません。'}</p>
-         <p>{priv.blessing.doubleUsed ? '二人への福配りは使用済みです。' : '今夜は2人まで選べます。2人に配れるのは試合中1回です。'}</p>
-       </div>}
+       {priv.confirmed && vote && <div hidden={flipping}>{selectionCard}</div>}{thiefMotion&&priv.thiefExchange?.targetId?<ThiefExchangeCards thiefName="あなた" targetName={name(priv.thiefExchange.targetId)+'さん'} stolenRole={priv.thiefExchange.stolenRole} animate privateView onComplete={finishThief}/>:<RoleRevealCard role={priv.role} animate={flipping} highlight={enduranceGlow} onComplete={finishReveal}/>}<div hidden={flipping||thiefMotion}><span className="role-team">{priv.role==='shishimai'?'第三陣営':teamOf(priv.role)==='wolves'?'人狼側':'村側'}</span><h2 className="your-role">{roleNames[priv.role]}</h2>{night ? <details className="night-role-help"><summary>役職の説明</summary><p>{roleDetails[priv.role]}</p></details> : <p>{roleDetails[priv.role]}</p>}
+       {(night || breadChoice || thiefChoice || blessingNight) && <section className="night-action" aria-labelledby="night-action-title">
+         <h3 id="night-action-title">{thiefChoice ? '役職を奪う'
+           : breadChoice ? '届けるパンを選ぶ'
+           : blessingNight ? '福を配る'
+           : role === 'wolf' ? '襲撃先を選ぶ'
+           : role === 'seer' ? '占う人を選ぶ'
+           : role === 'knight' ? '護衛先を選ぶ'
+           : role === 'doctor' ? '注射する人を選ぶ'
+           : '夜の確認'}</h3>
+         {!priv.confirmed && night && advice && <p className="inline-note action-advice">{advice}</p>}
+         {!priv.confirmed && night && !ability && !breadChoice && !blessingNight && <p>今夜は確認を押すと完了です。</p>}
+         {thiefChoice && canSelect && <p>交換はほかの人には知らされません。確定後は変更できません。</p>}
+         {canSelect && (thiefChoice || night && ability) && selector}
+         {night && canSelect && role === 'wolf' && <div className="strength-picker" role="group" aria-label="襲撃の希望度">
+           {([1,2,3] as const).map(value => <button type="button" className={wolfStrength === value ? 'selected' : ''} aria-pressed={wolfStrength === value} disabled={controlsDisabled} key={value} onClick={() => {
+             setWolfStrength(value);
+             if (priv.selection) void send('select', { targetId: priv.selection, strength: value });
+           }}>{value === 1 ? '弱く希望' : value === 2 ? '希望' : '強く希望'}（{value}）</button>)}
+         </div>}
+         {breadChoice && canSelect && breadSelector}
        {blessingNight && !priv.confirmed && (blessingCandidates.length ? <div className="target-grid player-targets" role="group" aria-label="福を配る人">
          {blessingCandidates.map(p => {
            const selected = blessingIds.includes(p.id);
@@ -231,13 +241,22 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
              })}><span className="target-name">{name(p.id)}</span>{selected && <span className="target-status"><span className="target-check" aria-hidden="true">✓</span>選択中</span>}</button>;
          })}
        </div> : <p>生存者には全員に配り終えました。夜の確認を完了してください。</p>)}
+         {thiefChoice && priv.confirmed && priv.selection && <div className="thief-waiting"><img src="/images/roles/card-back.png" alt="裏向きのカード" width="1024" height="1536"/><p>{name(priv.selection)}さん → あなた</p></div>}
+         {selectionCard}
+         {confirmButton}
+       </section>}
+       {priv.loverId&&<div className="secret-box"><strong>あなたの恋人</strong><p>{name(priv.loverId)}さん</p></div>}
+       {priv.thiefExchange?.targetId&&<div className="secret-box thief-result"><strong>怪盗の交換結果</strong><p><b>{name(priv.thiefExchange.targetId)}さん</b>の「{roleNames[priv.thiefExchange.stolenRole]}」を奪いました。</p><p>あなたの現在の役職は<strong>{roleNames[priv.thiefExchange.stolenRole]}</strong>です。</p></div>}
+       {priv.fanaticWolfIds && <div className="secret-box"><strong>あなたが知っている人狼</strong><p>{priv.fanaticWolfIds.map(name).join('、') || '該当者はいません。'}</p><small>この一覧はあなたにだけ表示されます。</small></div>}
+       {game.wolves&&<div className="secret-box"><strong>人狼の仲間</strong><p>{game.wolves.memberIds.filter(id=>id!==me).map(name).join('、')||'あなた1人です。'}</p><small>仲間が誰を希望したかは表示されません。</small></div>}
+       {role==='bodybuilder'&&priv.endurance&&<div className="secret-box" role="status"><strong>襲撃への耐久：{priv.endurance.used?'使用済み':'未使用（残り1回）'}</strong>{priv.endurance.used&&<p>{priv.endurance.day}日目の夜、筋肉で襲撃に耐えました。次の襲撃には耐えられません。</p>}</div>}
+       {priv.blessing && <div className="secret-box">
+         <strong>福を配った人</strong>
+         <p>{priv.blessing.deliveredIds.map(name).join('、') || 'まだ配っていません。'}</p>
+         <p>{priv.blessing.doubleUsed ? '二人への福配りは使用済みです。' : '今夜は2人まで選べます。2人に配れるのは試合中1回です。'}</p>
+       </div>}
        {role==='doctor' &&<div className="secret-box"><strong>自分の注射履歴</strong><p>誰からでも、試合中に2回注射されると死亡します。他の医者の行動や対象の累計回数は分かりません。</p>{priv.injectionHistory?.map((h,i)=><p key={i}>{h.day}日目：{h.targetId==='__no_injection__'?'注射しない':`${name(h.targetId)}さんに注射`}</p>)}</div>}
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
-       {night&&canSelect&&ability&&<><p className="night-task">対象を選んだあと、内容を確認して確定してください。</p><h3>{role==='wolf'?'襲撃する人':role==='seer'?'占う人':role==='doctor'?'注射する人':'護衛する人'}を選ぶ</h3>{advice&&<p className="inline-note action-advice">{advice}</p>}{role==='wolf'&&<div className="strength-picker" role="group" aria-label="襲撃の希望度">{([1,2,3] as const).map(value=><button type="button" className={wolfStrength===value?'selected':''} aria-pressed={wolfStrength===value} disabled={busy||!!pending||offline} key={value} onClick={()=>{setWolfStrength(value);if(priv.selection)void send('select',{targetId:priv.selection,strength:value});}}>{value===1?'弱く希望':value===2?'希望':'強く希望'}（{value}）</button>)}</div>}{selector}</>}
-       {breadChoice&&canSelect&&<><p className="night-task">{priv.selection?'パンを選びました。確定すると今夜のパンになります。':'今夜焼くパンを選んでください。'}</p><h3>届けるパンを選ぶ</h3>{breadSelector}</>}
-       {thiefChoice&&priv.confirmed&&priv.selection&&<div className="thief-waiting"><img src="/images/roles/card-back.png" alt="裏向きのカード" width="1024" height="1536"/><p>{name(priv.selection)}さん → あなた</p></div>}
-       {thiefChoice&&canSelect&&<><h3>役職を奪う人を選ぶ</h3><p>交換はほかの人には知らされません。確定後は変更できません。</p>{selector}</>}
-       {(night||breadChoice||thiefChoice||blessingNight)&&<>{!priv.confirmed&&selectionCard}{confirmButton}</>}
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>
      </div></div>}</section>}
      {(phase !== 'discussion' || (pub.day === 1 && pub.breadDelivery?.day === 0) || pub.compositionMode === 'random') && <section className={`panel phase-panel ${vote ? 'vote-panel' : ''}`}>{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}

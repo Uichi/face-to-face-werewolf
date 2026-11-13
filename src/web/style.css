@@ -958,3 +958,15 @@ button:enabled:active {
   --phase-band: linear-gradient(120deg, #775e36, #514728);
 }
 .game-top[data-phase-tone] > div:first-child { flex: 1; min-width: 0; }
+
+.night-action {
+  margin: 18px 0;
+  padding: clamp(12px, 4vw, 20px);
+  border: 1px solid #798aaa;
+  border-radius: 9px;
+  background: #1c2533;
+  overflow-wrap: anywhere;
+}
+.night-action h3 { margin: 0 0 10px; color: #f6dfb2; }
+.night-action .strength-picker { margin-block: 12px; }
+.night-role-help summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
