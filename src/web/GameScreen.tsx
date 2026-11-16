@@ -136,6 +136,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const seconds=pub.deadline===null?null:Math.max(0,Math.ceil((pub.deadline-clock-offset)/1000));
  const role=priv?.role;
  const hunterShot=phase==='hunter' && pub.hunter?.actorId===me;
+ const spectating = !self.alive && !hunterShot && phase !== 'finished';
  const vote=phase==='vote'||phase==='runoff';
  const phaseTone = vote || phase === 'execution' ? 'vote'
    : phase === 'night' || phase === 'firstNight' ? 'night'
@@ -203,9 +204,20 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    else void send('confirm');
  }}>{priv?.confirmed?'確定済み・みんなを待っています':busy?'送信中…':pending?'送信結果を確認中':offline?'再接続を待っています':choice?.button??(hunterShot?'この人への発砲を確定':vote?'投票先を選んでください':breadChoice?'このパンを焼く':night&&ability?'行動の対象を選んでください':thiefChoice?'この人の役職を奪う':phase==='roles'?'役職を確認しました':resultPhase?'結果を確認しました':'夜の確認を完了')}</button>;
 
- return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
+ const hostControls = host && <HostControls game={pub} seconds={seconds} disabled={controlsDisabled}
+   hostAlive={self.alive} name={name} onAction={action=>void send(action)}
+   onConfirm={(text,action,targetId)=>setDialog({text,action,targetId})}/>;
+ const publicLog = <PublicLog events={pub.publicLog ?? []} room={room}/>;
+ const listedPlayers = spectating ? [...alive, ...pub.players.filter(player => !player.alive)] : pub.players;
+ const playerList = <section className="panel"><div className="panel-heading">
+   <h2>参加者</h2><span>{alive.length}人生存</span>
+ </div><div className="game-players">{listedPlayers.map(player=><div className={player.alive?'':'eliminated'} key={player.id}>
+   <span>{name(player.id)}{player.id===me?'（あなた）':''}</span><small>{player.alive?'生存':'脱落'}</small>
+ </div>)}</div></section>;
+
+ return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''} ${spectating ? 'spectating' : ''}`}>
    <div className="game-top" data-phase-tone={phaseTone} key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1><span>{phaseNames[phase]}</span></h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
-   {(phase !== 'finished' || offline || busy || pending || error) &&
+   {((phase !== 'finished' && (!spectating || host)) || offline || busy || pending || error) &&
      <aside className={`current-task ${task.waiting ? 'task-waiting' : ''} ${error && !busy && !offline && !pending ? 'task-error' : ''}`}>
        <div role={error && !busy && !offline && !pending ? 'alert' : 'status'} aria-atomic="true">
          <span>今やること</span><h2>{task.title}</h2><p>{task.detail}</p>
@@ -216,9 +228,13 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
          onClick={() => void send(pending.action, {}, pending)}>同じ操作を再送する</button>}
      </aside>}
    {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
-   {!self.alive&&!hunterShot&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
+   {spectating && <aside className="spectator-note" aria-labelledby="spectator-title">
+     <h2 id="spectator-title" role="status">観戦中</h2>
+     <p>あなたは脱落しました。静かに試合を見守ってください。</p>
+   </aside>}
    {phase==='finished'?<GameResult game={pub} room={room} personalNotice={game.personalNotice}>{game.personalNotice?.kind==='endurance'&&<p className="inline-note" role="status">あなただけへの通知：{game.personalNotice.day}日目の夜、筋肉で襲撃に耐えました。襲撃への耐久は使用済みです。</p>}{host?<button className="primary" disabled={controlsDisabled} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じ設定で再戦（待機室へ）</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
-     {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">
+     {spectating && <>{hostControls}<div className="spectator-overview">{playerList}{publicLog}</div></>}
+     {!spectating&&priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">
        {priv.blessingReceived && <div className="secret-box">
          <strong role="status">獅子舞から福を授かりました。</strong>
          {blessingVideo && !flipping && !thiefMotion && <>
@@ -277,7 +293,9 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {priv.results.length>0&&<div className="secret-box"><strong>能力の結果</strong>{priv.results.map((r,i)=><p key={i}>{r.kind==='initial'?'初夜':`${r.day}日目 ${r.kind==='medium'?'霊媒':'占い'}`} · {name(r.targetId)}さんは<strong>{r.isWolf?'人狼です':'人狼ではありません'}</strong></p>)}</div>}
        <small>20秒後、または画面を離れたときに自動で隠れます。</small>
      </div></div>}</section>}
-     {(phase !== 'discussion' || (pub.day === 1 && pub.breadDelivery?.day === 0) || pub.compositionMode === 'random') && <section className={`panel phase-panel ${vote ? 'vote-panel' : ''}`}>{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
+     {(spectating
+       ? resultPhase || phase === 'runoff' || phase === 'hunter' || pub.compositionMode === 'random'
+       : phase !== 'discussion' || (pub.day === 1 && pub.breadDelivery?.day === 0) || pub.compositionMode === 'random') && <section className={`panel phase-panel ${vote ? 'vote-panel' : ''}`}>{pub.compositionMode==='random'&&<p className="inline-note">ランダム配役 · 開始時の人狼{pub.fixedWolves}人 · 候補：{pub.randomCandidates?.map(role=>roleNames[role]).join('、')||'なし'}。配役人数は終了まで秘密です。</p>}
        {phase==='hunter'&&<><HunterEffect/><p>{pub.voteResult&&pub.voteResult.executedId===pub.hunter?.actorId?`${name(pub.hunter?.actorId)}さんが${pub.voteResult.counts[pub.hunter!.actorId]??0}票で処刑されました。`:`${name(pub.hunter?.actorId)}さんが夜の処理で脱落しました。`}</p><h2>{name(pub.hunter?.actorId)}さんは狩人でした</h2><p>狩人だったため、最後の発砲を行います。発砲と恋人の後追いを処理してから勝敗を判定します。</p>{hunterShot?<><p>あなたが最後に撃つ生存者1人を選んでください。騎士の護衛では防げません。</p>{advice&&<p className="inline-note action-advice">{advice}</p>}{canSelect&&selector}{!priv?.confirmed&&selectionCard}{confirmButton}</>:<p>狩人本人の選択を待っています。</p>}</>}
        {phase==='roles'&&<>{self.alive&&!thiefChoice&&confirmButton}</>}
        {phase==='firstNight'&&<><p>初夜は襲撃・護衛・占いがありません。</p>{self.alive&&!breadChoice&&!blessingNight&&confirmButton}</>}
@@ -285,7 +303,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {vote&&<>{phase === 'runoff' && voteCounts && <div className="vote-outcome">
          <strong>決選投票へ</strong>
          <p>{pub.runoffIds.map(name).join('、')}が{highestVotes}票で同票でした。</p>
-       </div>}<p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{!priv?.confirmed&&selectionCard}{priv?.confirmed&&<p className="complete-note">投票は確定済みです。内容は「あなただけの情報」で確認できます。</p>}{self.alive&&confirmButton}</>}
+       </div>}{!spectating && <><p>{canVoteNoExecution?'自分以外の生存者、または「誰も処刑しない」に投票します。':'自分以外の生存者に投票します。'}確定後は変更できません。</p>{canSelect&&selector}{!priv?.confirmed&&selectionCard}{priv?.confirmed&&<p className="complete-note">投票は確定済みです。内容は「あなただけの情報」で確認できます。</p>}{self.alive&&confirmButton}</>}</>}
        {phase==='execution' && <div className="vote-outcome">
          <h2>{pub.voteResult?.executedId ? `${name(pub.voteResult.executedId)}さんが処刑されました` : '誰も処刑されませんでした'}</h2>
          {pub.voteResult?.executedId || noExecutionWon
@@ -304,10 +322,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
        {voteCounts && ['runoff','execution'].includes(phase) && <VoteCounts
          key={pub.phaseId} counts={voteCounts} name={name} runoffIds={phase === 'runoff' ? pub.runoffIds : []} />}
      </section>}
-     {host&&<HostControls game={pub} seconds={seconds} disabled={busy||!!pending||offline} hostAlive={self.alive} name={name} onAction={action=>void send(action)} onConfirm={(text,action,targetId)=>setDialog({text,action,targetId})}/>}
-     <PublicLog events={pub.publicLog??[]} room={room}/>
-     <section className="panel"><div className="panel-heading"><h2>参加者</h2><span>{alive.length}人生存</span></div><div className="game-players">{pub.players.map(p=><div className={p.alive?'':'eliminated'} key={p.id}><span>{name(p.id)}{p.id===me?'（あなた）':''}</span><small>{p.alive?'生存':'脱落'}</small></div>)}</div></section>
-
+     {!spectating && <>{hostControls}{publicLog}{playerList}</>}
    </>}
    {dialog&&<Confirmation onClose={()=>setDialog(null)}><h2 id="confirm-title">確認してください</h2><p>{dialog.text}</p><button className="primary" autoFocus disabled={busy} onClick={()=>void send(dialog.action,dialog.targetId?{targetId:dialog.targetId}:{})}>確定する</button><button className="secondary-button" onClick={()=>setDialog(null)}>戻る</button></Confirmation>}
  </div></ResultPresentation>;

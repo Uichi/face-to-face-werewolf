@@ -276,7 +276,24 @@ footer small { margin-left: auto; font-size: 12px; }
 .game-players { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 22px; }
 .game-players small { flex-shrink: 0; color: var(--muted); }
 .game-players .eliminated { color: #a7ada2; }
-.spectator-note { padding: 16px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.8; }
+.spectator-note {
+  padding: 16px 20px;
+  background: #20282b;
+  color: #e6edf0;
+  border: 1px solid #536368;
+  border-inline-start: 3px solid #9cafb6;
+  border-radius: 8px;
+  animation: spectator-arrive 650ms ease-out both;
+}
+[inert] .spectator-note { animation: none; }
+.spectator-note h2 { margin: 0 0 4px; font-size: clamp(21px, 5vw, 26px); }
+.spectator-note p { margin: 0; color: #c2ced2; font-size: 14px; line-height: 1.7; }
+.spectator-overview { display: grid; gap: 16px; min-width: 0; }
+.spectator-overview .panel { background: #182023; border-color: #48585d; }
+.spectator-overview .public-log-day { color: #bdd1d9; }
+.spectator-overview .public-log li::before { border-color: #a4bdc6; background: #a4bdc6; }
+.spectator-overview .game-players span { min-width: 0; overflow-wrap: anywhere; }
+@keyframes spectator-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .host-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .host-actions>* { flex: 1; }
 .game-screen .host-actions .primary { margin-top: 0; }
@@ -1106,3 +1123,15 @@ button:enabled:active {
 @keyframes wolves-victory-slash { from { transform: translateX(80%); opacity: 0; } to { transform: translateX(-4%); opacity: .65; } }
 @keyframes victory-title-enter { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes victory-card-enter { from { transform: translate(46%, 14%) rotate(17deg) scale(.65); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.game-screen.spectating .game-top {
+  --phase-background: linear-gradient(114deg, #293438, #161d20);
+  --phase-band: linear-gradient(120deg, #465960, #2c3b40);
+  --phase-border: #566b73;
+  background: var(--phase-background);
+  border-color: var(--phase-border);
+}
+.game-screen.spectating .game-top h1 { color: #edf4f5; }
+.game-screen.spectating .game-top h1::before { animation: none; }
+.game-screen.spectating .game-top .section-number { color: #b9cbd1; }
+.game-screen.spectating .game-timer strong { color: #edf4f5; }
