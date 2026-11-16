@@ -52,6 +52,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
   const roleLabel = (player: typeof game.players[number], initial = false) => {
     const role = initial ? player.initialRole : player.role;
     const possessed = initial ? player.initialWolfbound : player.wolfbound;
+    if (role === 'fool' && player.foolDisguise) return `バカ（本人には${roleNames[player.foolDisguise]}と表示）`;
     return role ? `${roleNames[role]}${possessed ? '（狼憑き）' : ''}` : '';
   };
   const drawnRoles = game.compositionMode === 'random' && game.phase === 'finished'
@@ -127,7 +128,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
         const changed = p.initialRole && (p.initialRole !== p.role || !!p.initialWolfbound !== !!p.wolfbound);
         return <div key={p.id} className={p.id === ending?.playerId || ending?.followedIds?.includes(p.id) ? 'last-eliminated' : ''}>
           <span>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}</span>
-          <strong className="result-role-label">{roleLabel(p)}{changed && <small>開始時：{roleLabel(p, true)}</small>}</strong>
+          <strong className="result-role-label">{p.role === 'fool' && <RoleImage role="fool" compact />}{roleLabel(p)}{changed && <small>開始時：{roleLabel(p, true)}</small>}</strong>
           <small>{ending?.followedIds?.includes(p.id) ? '恋人の後追いで脱落' : p.id === ending?.playerId ? '最後に脱落' : p.alive ? '生存' : '脱落'}</small>
         </div>;
       })}

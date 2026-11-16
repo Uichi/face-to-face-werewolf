@@ -1135,3 +1135,5 @@ button:enabled:active {
 .game-screen.spectating .game-top h1::before { animation: none; }
 .game-screen.spectating .game-top .section-number { color: #b9cbd1; }
 .game-screen.spectating .game-timer strong { color: #edf4f5; }
+
+.result-role-label .role-art { width: 40px; margin: 0 0 4px; }

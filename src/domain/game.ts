@@ -33,6 +33,7 @@ export type Game = {
   day: number; discussionMs: number; deadline: number | null; lastTime: number;
   selections: Record<string, string>; confirmed: string[]; runoffIds: string[];
   attackStrengths: Record<string, 1 | 2 | 3>;
+  thiefTargetId?: string;
   voteResult: VoteResult | null; victimId: string | null; winner: Team | null;
   scoring?: Scoring; scores?: Score[];
   lastElimination?: Elimination | null;
@@ -195,11 +196,14 @@ function settle(game: Game, now: number, random: RandomIndex): void {
       const target = game.players.find(p => p.alive && p.id === targetId && p.id !== thief.id);
       check(target, '怪盗の対象が不正です');
       const stolenRole = target.role;
+      const apparentRole = shownRole(target);
+      game.thiefTargetId = target.id;
       thief.role = stolenRole;
-      thief.apparentRole = stolenRole;
+      thief.apparentRole = apparentRole;
+      thief.decoy = stolenRole === 'fool';
       target.role = 'villager';
       // The target keeps seeing and operating the role they received at the start.
-      target.apparentRole = target.initialRole ?? stolenRole;
+      target.apparentRole = apparentRole;
       target.decoy = true;
       if (target.wolfbound) {
         thief.wolfbound = true;
@@ -442,7 +446,7 @@ export function viewFor(game: Game, viewerId: string) {
   const publicInfo = {
     thiefReveal: isFinished ? (() => {
       const thief = game.players.find(p => p.initialRole === 'thief' && p.role !== 'thief');
-      const target = game.players.find(p => p.decoy);
+      const target = game.players.find(p => game.thiefTargetId ? p.id === game.thiefTargetId : p.decoy);
       return thief && target ? { thiefId: thief.id, targetId: target.id, stolenRole: thief.role } : null;
     })() : null,
     resultConfirmation: false,
@@ -452,8 +456,8 @@ export function viewFor(game: Game, viewerId: string) {
     scores: isFinished ? structuredClone(game.scores ?? null) : null,
     id: game.id, hostId: game.hostId, phase: game.phase, phaseId: game.phaseId, day: game.day,
     deadline: game.deadline, winner: game.winner, consecutiveGuard: game.consecutiveGuard,
-    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true } : {}) })),
-    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length] as const).filter(([role, count]) => (role !== 'shishimai' && role !== 'fanatic') || count > 0)),
+    players: game.players.map(p => ({ id: p.id, alive: p.alive, ...(isFinished ? { role: p.role, initialRole: p.initialRole ?? p.role, wolfbound: p.wolfbound === true, initialWolfbound: p.initialWolfbound === true, ...((p.role === 'fool' || p.initialRole === 'fool') ? { foolDisguise: p.apparentRole } : {}) } : {}) })),
+    composition: game.randomCandidates && !isFinished ? null : Object.fromEntries(roles.map(role => [role, game.players.filter(p => (p.initialRole ?? p.role) === role).length] as const).filter(([role, count]) => (role !== 'shishimai' && role !== 'fanatic' && role !== 'fool') || count > 0)),
     compositionMode: game.randomCandidates ? 'random' as const : undefined,
     randomCandidates: game.randomCandidates ? [...game.randomCandidates] : undefined,
     fixedWolves: game.randomCandidates ? game.players.filter(p=>(p.initialRole??p.role)==='wolf').length : undefined,
@@ -474,9 +478,9 @@ export function viewFor(game: Game, viewerId: string) {
   if (!canSeePrivate) return { public: publicInfo, private: null, wolves: null, personalNotice };
   return {
     public: publicInfo, personalNotice,
-    private: { role: shownRole(viewer), actualRole: game.phase === 'firstNight' && viewer.initialRole === 'thief' ? viewer.role : undefined,
+    private: { role: shownRole(viewer), actualRole: game.phase === 'firstNight' && viewer.initialRole === 'thief' ? shownRole(viewer) : undefined,
       thiefExchange: viewer.initialRole === 'thief' && viewer.role !== 'thief' ? {
-        targetId: game.players.find(p => p.decoy)?.id ?? null, stolenRole: viewer.role,
+        targetId: game.thiefTargetId ?? game.players.find(p => p.decoy)?.id ?? null, stolenRole: shownRole(viewer),
       } : null,
       loverId: shownRole(viewer) === 'lover' ? (viewer.initialRole === 'lover'
         ? game.players.find(p => p.initialRole === 'lover' && p.id !== viewerId)?.id ?? null

@@ -1,6 +1,6 @@
 import { DEFAULT_COMPOSITIONS, validateComposition } from './rules.ts';
 import type { Composition, Role, RandomIndex } from './rules.ts';
-export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor','bodybuilder'];
+export const RANDOM_ROLES: Role[] = ['seer','medium','knight','madman','lover','baker','thief','hunter','doctor','bodybuilder','fool'];
 export const ONLINE_RANDOM_ROLES: Role[] = [...RANDOM_ROLES, 'shishimai', 'fanatic'];
 export const RANDOM_WEIGHT_LABELS = { normal: 'ふつう', frequent: '出やすい', rare: 'レア' } as const;
 export type RandomWeight = keyof typeof RANDOM_WEIGHT_LABELS;
@@ -15,7 +15,7 @@ export function randomCombinations(count: number, candidates: readonly Role[]): 
   const enumerate=(index:number,comp:Composition):void=>{
     if(index===ordered.length){if(comp.villager>=1){validateComposition(count,comp);combinations.push({...comp});}return;}
     const role=ordered[index]!;
-    for(const amount of role==='doctor'?[0,1,2]:role==='lover'?[0,2]:[0,1])enumerate(index+1,{...comp,[role]:amount,villager:comp.villager-amount});
+    for(const amount of role==='fool'?[0,1,2,3]:role==='doctor'?[0,1,2]:role==='lover'?[0,2]:[0,1])enumerate(index+1,{...comp,[role]:amount,villager:comp.villager-amount});
   };
   enumerate(0,{villager:count-wolves,wolf:wolves,seer:0,medium:0,knight:0,madman:0,lover:0,baker:0,thief:0,hunter:0,doctor:0,bodybuilder:0});
   return combinations;

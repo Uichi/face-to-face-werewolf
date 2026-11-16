@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
-import { roles, type Role } from '../domain/rules.ts';
+import { FOOL_DISGUISES, roles, type Role } from '../domain/rules.ts';
 import GameScreen from './GameScreen.tsx';
 import { roleNames } from './types.ts';
-import { createShishimaiRecipientScenario, createShishimaiScenario, createThiefRevealScenario, createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
+import { createFoolScenario, createShishimaiRecipientScenario, createShishimaiScenario, createThiefRevealScenario, createRandomSoloSession, applySoloAction, completeSoloPhase, createCheckScenario, createEndingScenario, createRobbedScenario, createSoloSession, soloResponse } from './solo-test.ts';
 import type { SoloSession } from './solo-test.ts';
 
 const phaseNames = { roles: '役職確認', firstNight: '初夜', discussion: '昼の議論', vote: '投票', runoff: '決選投票', execution: '処刑結果', night: '夜の行動', morning: '翌朝', hunter:'狩人の発砲', finished: '試合終了' } as const;
@@ -32,9 +32,11 @@ export default function SoloTest({ onExit }: { onExit: () => void }) {
       <button className="secondary-button" onClick={() => update(createShishimaiScenario(true))}>獅子舞も勝利 → 結果</button>
       <button className="secondary-button" onClick={() => update(createShishimaiScenario(true, 5, 'shortfall'))}>獅子舞の福があと1人足りない → 結果</button>
       <button className="secondary-button" onClick={() => update(createShishimaiScenario(true, 5, 'eliminated'))}>獅子舞が途中で脱落 → 結果</button>
+      {FOOL_DISGUISES.map(disguise => <button className="secondary-button" key={disguise} onClick={() => update(createFoolScenario(disguise))}>バカ3人が「{roleNames[disguise]}」を名乗る → 役職確認</button>)}
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario())}>怪盗の交換演出 → 初夜</button>
       <button className="secondary-button" onClick={()=>update(createThiefRevealScenario(true))}>怪盗の答え合わせ → 結果</button>
-      {role !== 'thief'  && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}
+      <button className="secondary-button" onClick={() => update(createRobbedScenario('fool'))}>怪盗がバカを奪う → 初夜</button>
+      {role !== 'thief' && role !== 'fool' && <button className="secondary-button" onClick={() => update(createRobbedScenario(role, playerCount))}>怪盗に「{roleNames[role]}」を奪われる → 初夜</button>}
       {([['bodybuilder-first','筋肉で初めての襲撃に耐える'],['bodybuilder-second','使用済みで2回目の襲撃を受ける'],['bodybuilder-guard','騎士の護衛で耐久を温存'],['bodybuilder-doctor','医者の注射で耐久を温存'],['thief-bodybuilder','怪盗がボディービルダーを奪う']] as const).map(([kind,label])=><button className="secondary-button" key={kind} onClick={()=>update(createCheckScenario(kind))}>{label}</button>)}
       {([['doctor-protect','医者の注射で襲撃を防ぐ'],['doctor-delayed','数日後の2回目の注射で死亡'],['doctor-double','医者2人が同夜に注射'],['doctor-hunter','2回目の注射で狩人が発砲'],['thief-doctor','怪盗が医者を奪う']] as const).map(([kind,label])=><button className="secondary-button" key={kind} onClick={()=>update(createCheckScenario(kind))}>{label}</button>)}
       <button className="secondary-button" onClick={() => update(createEndingScenario('village'))}>人狼を処刑 → 村側勝利</button>

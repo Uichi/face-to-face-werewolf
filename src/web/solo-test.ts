@@ -1,7 +1,7 @@
 import { randomComposition, RANDOM_ROLES } from '../domain/random-composition.ts';
 import { applyCommand, BREAD_TYPES, createGame, viewFor } from '../domain/game.ts';
 import type { Command, Game, Phase } from '../domain/game.ts';
-import { DEFAULT_COMPOSITIONS, NO_EXECUTION_ID } from '../domain/rules.ts';
+import { DEFAULT_COMPOSITIONS, FOOL_DISGUISES, NO_EXECUTION_ID } from '../domain/rules.ts';
 import type { Composition, Role } from '../domain/rules.ts';
 import { DEFAULT_VICTORY_POINTS } from '../domain/scoring.ts';
 import type { GameResponse } from './game-api.ts';
@@ -27,11 +27,14 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   const chosen = game.players.find(player => player.role === role)!;
   const mine = game.players.find(player => player.id === SOLO_VIEWER)!;
   [chosen.role, mine.role] = [mine.role, chosen.role];
-  chosen.initialRole = chosen.apparentRole = chosen.role;
-  mine.initialRole = mine.apparentRole = mine.role;
+  for (const player of [chosen, mine]) {
+    player.initialRole = player.role;
+    player.apparentRole = player.role === 'fool' ? FOOL_DISGUISES[0] : player.role;
+    player.decoy = player.role === 'fool';
+  }
   const room: Room = {
     id: 'solo-room', code: 'TESTMODE', hostId: SOLO_VIEWER, viewerId: SOLO_VIEWER, status: 'playing', revision: 1,
-    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, fanaticRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
+    loverRole: true, bakerRole: true, breadChoices: true, thiefRole: true, hunterRole: true, doctorRole: true, bodybuilderRole: true, shishimaiRole: true, fanaticRole: true, foolRole: true, firstDayNoExecution: true, wolfboundEnabled: true, victoryPoints: { ...DEFAULT_VICTORY_POINTS }, discussionMinutes: 1, composition,
     customComposition: true, members: ids.map((id, index) => ({ id, nickname: index === 0 ? 'あなた' : `テスト${index}`, connected: true, points: 0 })),
   };
   return { game, room, now: game.lastTime, sequence: 0 };
@@ -43,6 +46,30 @@ export function createRandomSoloSession(count=10):SoloSession {
   const session=createSoloSession('villager',count);
   session.game=createGame({id:session.game.id,hostId:SOLO_VIEWER,playerIds:session.game.players.map(p=>p.id),composition,discussionMinutes:1,randomCandidates:RANDOM_ROLES},session.now,random);
   session.room={...session.room,composition:null,compositionMode:'random',randomComposition:true,randomCandidates:[...RANDOM_ROLES],fixedWolves:composition.wolf,customComposition:false};
+  return session;
+}
+
+export function createFoolScenario(disguise: typeof FOOL_DISGUISES[number]): SoloSession {
+  const session = createSoloSession('fool', 10);
+  const composition = session.room.composition!;
+  const villagers = session.game.players.filter(player => player.role === 'villager');
+  const fools = session.game.players.filter(player => player.role === 'fool');
+  for (const player of villagers.splice(0, 2)) {
+    player.initialRole = player.role = 'fool';
+    fools.push(player);
+  }
+  composition.fool = fools.length;
+  composition.villager -= 2;
+  for (const player of fools) {
+    player.decoy = true;
+    player.apparentRole = disguise;
+  }
+  if (!session.game.players.some(player => player.role === disguise)) {
+    const player = villagers[0]!;
+    player.initialRole = player.role = player.apparentRole = disguise;
+    composition[disguise] = 1;
+    composition.villager--;
+  }
   return session;
 }
 

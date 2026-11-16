@@ -184,6 +184,62 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
    assert.deepEqual(after.public.failedAttacks,settled.failedAttacks);
   }
  });
+ await t.test('バカ3人の配役・偽装と怪盗の取得は終了まで本人にも秘密', async () => {
+  const seats = [10, 1, 2, 3, 4, 5, 6];
+  await user(seats[0]!);
+  let r = await raw('lobby_command_bodybuilder', 'create', { nickname: 'バカ検証', requestId: randomUUID() });
+  const roomId = r.room.id;
+  assert.ok(r.room.randomCandidates.includes('fool'));
+  for (let i=1; i<7; i++) {
+   await user(seats[i]!);
+   r = await raw('lobby_command_bodybuilder', 'join', { code: r.room.code, nickname: '参加'+i });
+  }
+  await user(seats[0]!);
+  const settings = { roomId, revision: r.room.revision, discussionMinutes: 1, compositionMode: 'custom',
+   composition: { villager: 1, wolf: 1, seer: 1, medium: 0, knight: 0, thief: 1, fool: 3 },
+   victoryPoints: { ...r.room.victoryPoints, fool: 9 } };
+  await assert.rejects(() => raw('lobby_command_bodybuilder', 'settings', { ...settings, composition: { ...settings.composition, villager: 0, fool: 4 } }), /0〜3人/);
+  r = await raw('lobby_command_bodybuilder', 'settings', settings);
+  assert.equal(r.room.foolRole, true);
+  const start = { roomId, revision: r.room.revision, requestId: randomUUID() };
+  r = await raw('game_command_bodybuilder', 'start', start);
+  assert.equal(r.game.public.composition.fool, 3);
+  assert.ok(r.game.public.players.every((p:any) => p.role === undefined && p.foolDisguise === undefined));
+  const gameId = r.game.public.id;
+  const phaseId = r.game.public.phaseId;
+  assert.equal((await raw('game_command_bodybuilder', 'start', start)).game.public.id, gameId);
+  await assert.rejects(() => db.query('select state from app_private.games'), /permission denied/);
+  const command = (action:string, data:object = {}) => raw('game_command_bodybuilder', action, { roomId, gameId, phaseId, requestId: randomUUID(), ...data });
+  await db.exec('reset role');
+  const load = async () => (await db.query<{state:any}>('select state from app_private.games where room_id=$1', [roomId])).rows[0]!.state;
+  const initial = await load();
+  const fools = initial.players.filter((p:any) => p.role === 'fool');
+  assert.ok(fools.every((p:any) => p.apparentRole === 'seer' && p.decoy));
+  const target = fools.at(-1);
+  const thief = initial.players.find((p:any) => p.role === 'thief');
+  const thiefSeat = r.room.members.findIndex((m:any) => m.id === thief.id);
+  for (let i=0; i<7; i++) {
+   await user(seats[i]!);
+   if (i === thiefSeat) await command('select', { targetId: target.id });
+   r = await command('confirm');
+  }
+  assert.equal(r.game.public.phase, 'firstNight');
+  await user(seats[thiefSeat]!);
+  r = await raw('game_command_bodybuilder', 'get', { roomId });
+  assert.equal(r.game.private.role, 'seer');
+  assert.deepEqual(r.game.private.thiefExchange, { targetId: target.id, stolenRole: 'seer' });
+  assert.equal(r.game.public.thiefReveal, undefined);
+  await db.exec('reset role');
+  const exchanged = await load();
+  assert.equal(exchanged.players.find((p:any) => p.id === target.id).role, 'villager');
+  assert.equal(exchanged.players.find((p:any) => p.id === thief.id).role, 'fool');
+  const { view } = (await db.query<{view:any}>(
+   "select app_private.bodybuilder_view($1::jsonb || '{\"phase\":\"finished\"}', $2) view",
+   [JSON.stringify(exchanged), thief.id])).rows[0]!;
+  assert.equal(view.public.players.find((p:any) => p.id === thief.id).foolDisguise, 'seer');
+  assert.equal(view.public.thiefReveal.targetId, target.id);
+  assert.equal(view.public.thiefReveal.stolenRole, 'fool');
+ });
  await t.test('パンあり・なし・旧データの未設定値・初夜・通常朝の表示を保持',async()=>{
   const roomId=(await db.query<{room_id:string}>('select room_id from app_private.games limit 1')).rows[0]!.room_id;
   const original=(await db.query<{state:any}>('select state from app_private.games where room_id=$1',[roomId])).rows[0]!.state;

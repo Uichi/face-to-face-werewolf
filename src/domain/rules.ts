@@ -1,7 +1,7 @@
 // Server-only rules. Never serialize this module's full input state to clients.
-export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic';
+export type Role = 'villager' | 'wolf' | 'seer' | 'medium' | 'knight' | 'madman' | 'lover' | 'baker' | 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic' | 'fool';
 export type Team = 'village' | 'wolves';
-export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number; shishimai?: number; fanatic?: number };
+export type Composition = Record<Exclude<Role, 'thief' | 'hunter' | 'doctor' | 'bodybuilder' | 'shishimai' | 'fanatic' | 'fool'>, number> & { thief?: number; hunter?: number; doctor?: number; bodybuilder?: number; shishimai?: number; fanatic?: number; fool?: number };
 export type Player = { id: string; role: Role; alive: boolean; initialRole?: Role; apparentRole?: Role; decoy?: boolean; wolfbound?: boolean; initialWolfbound?: boolean };
 export type AttackBlockReason = 'guard' | 'doctor' | 'endurance' | 'injection';
 export type FailedAttack = { day: number; targetId: string; reasons: AttackBlockReason[] };
@@ -10,7 +10,8 @@ export type AttackChoice = Choice & { strength?: 1 | 2 | 3 };
 // Production callers must supply a cryptographically secure uniform integer source.
 export type RandomIndex = (exclusiveMax: number) => number;
 
-export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor', 'bodybuilder', 'shishimai', 'fanatic'];
+export const roles: Role[] = ['villager', 'wolf', 'seer', 'medium', 'knight', 'madman', 'lover', 'baker', 'thief', 'hunter', 'doctor', 'bodybuilder', 'shishimai', 'fanatic', 'fool'];
+export const FOOL_DISGUISES = ['seer', 'medium', 'knight', 'doctor', 'baker', 'bodybuilder'] as const;
 export const DEFAULT_COMPOSITIONS: Readonly<Record<number, Readonly<Composition>>> = Object.freeze({
   5: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 0, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
   6: Object.freeze({ villager: 3, wolf: 1, seer: 1, medium: 1, knight: 0, madman: 0, lover: 0, baker: 0, thief: 0, hunter: 0, doctor: 0, bodybuilder: 0 }),
@@ -40,6 +41,7 @@ export function validateComposition(count: number, composition: Composition): vo
   requireRule(roles.reduce((sum, role) => sum + (composition[role] ?? 0), 0) === count, '配役合計が参加人数と一致しません');
   requireRule(composition.wolf >= 1 && composition.wolf < count - composition.wolf, '人狼は1人以上、人間（狂人を含む）より少なくしてください');
   requireRule(composition.lover === 0 || composition.lover === 2, '恋人は0人か2人で設定してください');
+  requireRule((composition.fool ?? 0) <= 3, 'バカは0〜3人です');
   requireRule((composition.doctor ?? 0) <= 2, '医者は0〜2人です');
   requireRule(['seer', 'medium', 'knight', 'madman', 'baker', 'thief', 'hunter', 'bodybuilder', 'shishimai', 'fanatic'].every(role => (composition[role as Role] ?? 0) <= 1), '占い師・霊媒師・騎士・狂人・パン屋・怪盗・狩人・ボディービルダー・獅子舞・狂信者は各0〜1人です');
 }
@@ -48,11 +50,16 @@ export function assignRoles(ids: readonly string[], composition: Composition, ra
   validateComposition(ids.length, composition);
   requireRule(new Set(ids).size === ids.length && ids.every(id => id.length > 0), '参加者IDが不正です');
   const pool = roles.flatMap(role => Array<Role>(composition[role] ?? 0).fill(role));
-  return ids.map(id => {
+  const players: Player[] = ids.map(id => {
     const role = pick(pool, random);
     pool.splice(pool.indexOf(role), 1);
     return { id, role, initialRole: role, apparentRole: role, alive: true };
   });
+  for (const player of players) if (player.role === 'fool') {
+    player.apparentRole = pick(FOOL_DISGUISES, random);
+    player.decoy = true;
+  }
+  return players;
 }
 
 export function teamOf(role: Role): Team { return role === 'wolf' || role === 'madman' || role === 'fanatic' ? 'wolves' : 'village'; }
