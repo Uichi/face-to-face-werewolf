@@ -4,7 +4,7 @@ import type { GameView } from './game-api.ts';
 import { breadNames } from './action-choice.ts';
 import type { BreadType, PublicLogEvent } from '../domain/game.ts';
 import { NO_EXECUTION_ID } from '../domain/rules.ts';
-export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief' | 'breadVideo' | 'bread' | 'voteTally'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; breadType?: BreadType; hunterEffect?: 'ready' | 'shot'; voteTally?: { counts: Record<string, number>; runoffIds: string[] } };
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief' | 'breadVideo' | 'bread' | 'voteTally' | 'shishimaiVictory'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; breadType?: BreadType; hunterEffect?: 'ready' | 'shot'; voteTally?: { counts: Record<string, number>; runoffIds: string[] } };
 type PublicGame = GameView['public'];
 function breadFrames(id: string, breadType: BreadType): ResultFrame[] {
   return [
@@ -76,8 +76,22 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
     if (event.kind === 'shotCancelled') frames.push({id:event.id,kind:'notice',title:'狩人の発砲を中止しました',detail:event.reason ?? '',duration:3500,label:'狩人の発砲',day:event.day});
   }
   if (!nightFollowed) events.filter(e => ['attack','injection'].includes(e.kind)).forEach(follow);
-  if (current.phase === 'finished' && previous.phase !== 'finished' && current.winner) frames.push({id:'victory',kind:'victory',title:`${current.winner === 'village' ? '村側' : '人狼側'}の勝利！`,detail:current.winner === 'village' ? '生存している人狼が0人になりました。' : '生存人狼が、生存人間と同数以上になりました。',duration:5000,label:'勝敗が決まりました',team:current.winner});
-  if(current.phase==='finished'&&previous.phase!=='finished'){const exchange=publicThiefReveal(current);if(exchange)frames.push({id:'thief-reveal',kind:'thief',title:'怪盗の答え合わせ',detail:'',duration:5000,exchange});}
+  if (current.phase === 'finished' && previous.phase !== 'finished') {
+    if (current.winner) {
+      frames.push({
+        id: 'victory', kind: 'victory', team: current.winner, duration: 5000,
+        title: current.winner === 'village' ? '村側の勝利！' : '人狼側の勝利！', detail: '',
+      });
+      if (current.shishimaiWinnerId) {
+        frames.push({
+          id: 'shishimai-victory', kind: 'shishimaiVictory', duration: 4000,
+          title: '獅子舞も勝利！', detail: `${name(current.shishimaiWinnerId)}さん`,
+        });
+      }
+    }
+    const exchange = publicThiefReveal(current);
+    if (exchange) frames.push({id:'thief-reveal',kind:'thief',title:'怪盗の答え合わせ',detail:'',duration:5000,exchange});
+  }
   return frames;
 }
 

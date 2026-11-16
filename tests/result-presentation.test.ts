@@ -126,3 +126,18 @@ test('同票は候補を同時に強調し、決選投票の処刑なしを別�
  assert.equal(resolvedFrames[0]?.label, '決選投票');
  assert.match(resolvedFrames[1]!.title, /誰も処刑されません/);
 });
+
+test('決着後だけ陣営の勝利を表示し、獅子舞の追加勝利をその次に表示する', () => {
+ const base = snapshot();
+ const before = { ...base, phase: 'hunter' as const, winner: null };
+ for (const winner of ['village', 'wolves'] as const) {
+  const finished = { ...base, winner, shishimaiWinnerId: 'lion' };
+  const frames = resultFrames(before, finished, name);
+  assert.deepEqual(frames.map(frame => frame.kind), ['victory', 'shishimaiVictory']);
+  assert.equal(frames[0]?.team, winner);
+  assert.equal(frames[1]?.detail, 'lionさん');
+  assert.deepEqual(resultFrames(finished, finished, name), []);
+  assert.deepEqual(resultFrames(before, { ...finished, phase: 'hunter' }, name), []);
+  assert.deepEqual(resultFrames(before, { ...finished, shishimaiWinnerId: null }, name).map(frame => frame.kind), ['victory']);
+ }
+});

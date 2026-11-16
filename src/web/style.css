@@ -1020,3 +1020,89 @@ button:enabled:active {
 .presentation-tally .vote-tally-highlight { animation: vote-leader-reveal 260ms ease-out 980ms backwards; }
 .presentation-tally .vote-tally-row strong { font-size: clamp(18px, 5vw, 26px); }
 @keyframes vote-leader-reveal { from { border-color: var(--line); } to { border-color: var(--gold); } }
+
+.scene-victory, .scene-shishimaiVictory {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: clamp(210px, 38dvh, 330px);
+  padding: clamp(12px, 4vw, 24px);
+  border: 1px solid var(--victory-border);
+  background: var(--victory-background);
+}
+.scene-victory.village {
+  --victory-border: #8e9762;
+  --victory-background: linear-gradient(150deg, #10241c, #284334 56%, #0d1712);
+  --victory-title: #fff0bc;
+  --victory-ribbon: #173d2d;
+}
+.scene-victory.wolves {
+  --victory-border: #be685e;
+  --victory-background: linear-gradient(150deg, #351717, #190f12 62%, #0c090a);
+  --victory-title: #ffe7dd;
+  --victory-ribbon: #672c29;
+}
+.scene-shishimaiVictory {
+  --victory-border: #bc9553;
+  --victory-background: radial-gradient(ellipse at 50% 15%, #62461e, #211a13 75%);
+  --victory-title: #fff0bc;
+  --victory-ribbon: #5b401e;
+}
+.scene-victory::before {
+  content: '';
+  position: absolute;
+  inset: -15% -30%;
+  z-index: -1;
+  pointer-events: none;
+}
+.scene-victory.village::before {
+  background: linear-gradient(122deg, transparent 33%, #e9c77166 50%, transparent 66%);
+  animation: village-victory-light 1250ms ease-out both;
+}
+.scene-victory.wolves::before {
+  background: repeating-linear-gradient(124deg, transparent 0 24%, #b13935 24.4% 26%, #e67463 26.1% 26.5%, transparent 27% 38%);
+  animation: wolves-victory-slash 850ms cubic-bezier(.18,.65,.22,1) both;
+}
+.result-scene.scene-victory h2, .result-scene.scene-shishimaiVictory h2 {
+  z-index: 0;
+  position: relative;
+  width: 100%;
+  padding: 10px 12px;
+  margin: 12px 0;
+  color: var(--victory-title);
+  font-size: clamp(25px, 7vw, 46px);
+  font-weight: 900;
+  text-shadow: 0 2px 8px #000a;
+  animation: victory-title-enter 540ms cubic-bezier(.15,.65,.25,1) 250ms both;
+}
+.scene-victory h2::before, .scene-shishimaiVictory h2::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  border-block: 1px solid var(--victory-border);
+  background: var(--victory-ribbon);
+}
+.scene-victory #presentation-detail:empty { display: none; }
+.scene-shishimaiVictory #presentation-detail { margin: 0; }
+.scene-victory .presentation-position, .scene-shishimaiVictory .presentation-position {
+  color: #f1e5cc;
+  margin-bottom: 10px;
+}
+.victory-role-card {
+  width: min(32vw, 110px, 17dvh);
+  border: 2px solid #e8c374;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 24px #e8bd7355;
+  animation: victory-card-enter 720ms cubic-bezier(.2,.8,.3,1) both;
+}
+.victory-role-card .role-art { display: block; width: 100%; height: auto; margin: 0; border: 0; border-radius: 0; }
+.victory-role-card .role-art[hidden] { display: none; }
+.victory-role-card:has(.role-art[hidden]) { display: none; }
+
+@keyframes village-victory-light { from { transform: translateX(-55%); opacity: 0; } to { transform: translateX(8%); opacity: 1; } }
+@keyframes wolves-victory-slash { from { transform: translateX(80%); opacity: 0; } to { transform: translateX(-4%); opacity: .65; } }
+@keyframes victory-title-enter { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes victory-card-enter { from { transform: translate(46%, 14%) rotate(17deg) scale(.65); opacity: 0; } to { transform: none; opacity: 1; } }
