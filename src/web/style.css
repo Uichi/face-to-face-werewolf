@@ -316,7 +316,6 @@ footer small { margin-left: auto; font-size: 12px; }
 .final-person strong { font-family: var(--serif); font-size: 27px; }
 .final-person b { font-size: 24px; color: var(--danger); }
 .final-role { display: inline-block; font-size: 14px; color: var(--gold-bright); border: 1px solid var(--line-gold); border-radius: 20px; padding: 5px 12px; }
-.final-attack-explanation { padding: 12px 14px; background: var(--danger-bg); border-radius: 6px; color: var(--danger); }
 .victory-summary {
   --victory-band: linear-gradient(112deg, #294b37, #365340);
   --victory-line: #c5a66b;
@@ -630,12 +629,12 @@ footer small { margin-left: auto; font-size: 12px; }
 .review-leaders>span { font-size:13px; color:var(--gold-bright); }
 .review-leaders p { margin:8px 0; font-weight:700; }
 .review-leaders small,.review-next-game>p { color:var(--muted); font-size:13px; line-height:1.8; }
-.review-next-game>h4 { margin:20px 0 8px; font-size:18px; }
 .review-next-game>.primary { width:100%; margin:14px 0; }
 .review-next-game .result-exit { margin:18px 0 0; }
-.review-navigation { display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid var(--line); padding-top:18px; margin-top:20px; }
+.review-navigation { display:flex; flex-wrap:wrap; gap:10px; margin:24px clamp(18px, 4vw, 28px); }
 .review-navigation a { padding:11px 14px; min-height:44px; border:1px solid var(--line-gold); border-radius:8px; color:var(--gold-bright); text-decoration:none; font-size:13px; }
-#match-review-timeline,#match-review-scores,#match-review-roles { scroll-margin-top:24px; }
+.result-panel [id^="match-review-"] { scroll-margin-top:24px; }
+.final-event, .winning-members { overflow-wrap:anywhere; }
 .review-caption,.review-empty { color:var(--muted); font-size:13px; line-height:1.9; }
 .result-panel .review-empty { margin:24px 28px; }
 .review-timeline { margin:24px 28px; padding:20px; }
