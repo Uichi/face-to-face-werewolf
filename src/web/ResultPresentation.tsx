@@ -1,3 +1,5 @@
+import VoteCounts from './VoteCounts.tsx';
+import { NO_EXECUTION_ID } from '../domain/rules.ts';
 import BreadImage from './BreadImage.tsx';
 import HunterEffect from './HunterEffect.tsx';
 import ThiefExchangeCards from './ThiefExchangeCards.tsx';
@@ -9,6 +11,7 @@ import { latestResultFrames, resultFrames } from './result-presentation.ts';
 import type { ResultFrame } from './result-presentation.ts';
 
 export default function ResultPresentation({ game, room, paused, allowReplay = false, children }: { game: GameView['public']; room: Room; paused: boolean; allowReplay?: boolean; children: ReactNode }) {
+  const name = (id: string) => room.members.find(member => member.id === id)?.nickname ?? '参加者';
   const previous = useRef<GameView['public'] | null>(null);
   const [frames, setFrames] = useState<ResultFrame[]>([]);
   const [index, setIndex] = useState(0);
@@ -49,13 +52,20 @@ export default function ResultPresentation({ game, room, paused, allowReplay = f
     document.addEventListener('visibilitychange', visible); window.addEventListener('offline', suspend); media.addEventListener('change', reduced);
     return () => { document.removeEventListener('visibilitychange', visible); window.removeEventListener('offline', suspend); media.removeEventListener('change', reduced); };
   }, []);
-  return <><div inert={modal} aria-hidden={modal ? true : undefined}>{allowReplay && (['execution','morning','hunter','finished'].includes(game.phase) || game.phase === 'discussion' && game.day === 1 && game.breadDelivery?.day === 0) && <button className="secondary-button solo-result-replay" onClick={() => { if (matchMedia('(prefers-reduced-motion: reduce)').matches) return; setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); setHeld(false); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && transition && <div className={`day-night-transition transition-${current.kind}`} key={`${game.id}:${current.id}:${game.phaseId}`}><div className="celestial-scene" role="img" aria-label={current.kind === 'dusk' ? '夜へ切り替わります' : '朝へ切り替わります'}><svg className="celestial moon" viewBox="0 0 100 100" aria-hidden="true"><path d="M70 13A39 39 0 1 0 87 71 36 36 0 0 1 70 13Z"/></svg><svg className="celestial sun" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="20"/><path d="M50 6v10M50 84v10M6 50h10M84 50h10M19 19l7 7M74 74l7 7M19 81l7-7M74 26l7-7"/></svg></div><button className="text-button transition-skip" onClick={() => setIndex(value => value + 1)}>演出をスキップ</button></div>}{current && !transition && <dialog ref={dialog} className="result-presentation" aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
+  return <><div inert={modal} aria-hidden={modal ? true : undefined}>{allowReplay && (['runoff','execution','morning','hunter','finished'].includes(game.phase) || game.phase === 'discussion' && game.day === 1 && game.breadDelivery?.day === 0) && <button className="secondary-button solo-result-replay" onClick={() => { if (matchMedia('(prefers-reduced-motion: reduce)').matches) return; setFrames(latestResultFrames(game, id => room.members.find(m => m.id === id)?.nickname ?? '参加者')); setIndex(0); setHeld(false); }}>結果の演出をもう一度見る（試遊）</button>}{children}</div>{current && transition && <div className={`day-night-transition transition-${current.kind}`} key={`${game.id}:${current.id}:${game.phaseId}`}><div className="celestial-scene" role="img" aria-label={current.kind === 'dusk' ? '夜へ切り替わります' : '朝へ切り替わります'}><svg className="celestial moon" viewBox="0 0 100 100" aria-hidden="true"><path d="M70 13A39 39 0 1 0 87 71 36 36 0 0 1 70 13Z"/></svg><svg className="celestial sun" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="20"/><path d="M50 6v10M50 84v10M6 50h10M84 50h10M19 19l7 7M74 74l7 7M19 81l7-7M74 26l7-7"/></svg></div><button className="text-button transition-skip" onClick={() => setIndex(value => value + 1)}>演出をスキップ</button></div>}{current && !transition && <dialog ref={dialog} className="result-presentation" aria-labelledby="presentation-title" aria-describedby="presentation-detail" onCancel={() => setFrames([])}>
     <div className={`result-scene scene-${current.kind} ${current.team ?? ''} ${current.hunterEffect==='shot'?'hunter-shot-confirmed':''}`} key={current.id}>
       <div className="presentation-position" aria-label={`全${frames.length}件中${index + 1}件目`}>{index + 1} / {frames.length}</div>
       <span className="section-number">{current.day !== undefined ? `${current.day}日目 · ` : ''}{current.label ?? '公開された出来事'}</span>
       {current.hunterEffect&&<HunterEffect key={current.id} mode={current.hunterEffect}/>}<h2 id="presentation-title">{current.title}</h2>{current.exchange&&<ThiefExchangeCards key={current.id} thiefName={(room.members.find(m=>m.id===current.exchange!.thiefId)?.nickname??'怪盗')+'さん'} targetName={(room.members.find(m=>m.id===current.exchange!.targetId)?.nickname??'相手')+'さん'} stolenRole={current.exchange.stolenRole} animate/>}{video && <video className="bread-delivery-video" aria-label="パン屋がパンを配る動画" autoPlay muted playsInline
         preload="auto" src="/videos/bread-delivery.mp4" onEnded={advance} onError={advance} />}
       {current.breadType && <BreadImage type={current.breadType} />}
+      {current.voteTally && <>
+        <div className="vote-close-sweep" aria-hidden="true" />
+        <div className="presentation-tally" tabIndex={0} role="region" aria-label="候補ごとの得票数">
+          <VoteCounts counts={current.voteTally.counts} runoffIds={current.voteTally.runoffIds}
+            name={id => id === NO_EXECUTION_ID ? '誰も処刑しない' : name(id)} title={null} />
+        </div>
+      </>}
       <p id="presentation-detail" role="status">{current.detail}</p>
     </div>
     {video ? <button className="primary" autoFocus onClick={advance}>動画をスキップ</button> : <>

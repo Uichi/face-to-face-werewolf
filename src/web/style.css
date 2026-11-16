@@ -991,3 +991,32 @@ button:enabled:active {
 
 .current-task.task-error { border-inline-start-color: var(--danger); }
 .current-task .task-recovery { margin-top: 12px; width: 100%; }
+
+.scene-voteTally { position: relative; isolation: isolate; overflow: hidden; }
+.scene-voteTally h2 { margin-block: 8px 14px; }
+.scene-voteTally .presentation-position { margin-bottom: 8px; }
+.scene-voteTally #presentation-detail:empty { display: none; }
+.vote-close-sweep {
+  position: absolute;
+  inset: 0 -55%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(110deg, #080a09 49%, #f0d292 49.3% 50%, #ad8749 50.3%, transparent 50.6%);
+  animation: vote-close-sweep 650ms cubic-bezier(.55,.06,.26,1) forwards;
+}
+@keyframes vote-close-sweep { from { transform: translateX(34%); } to { transform: translateX(-75%); } }
+.presentation-tally {
+  width: 100%;
+  max-height: min(40dvh, 340px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 3px;
+}
+.presentation-tally:focus-visible { outline-offset: -3px; }
+.presentation-tally .vote-tally,
+.presentation-tally .vote-tally ul { margin: 0; }
+.presentation-tally .vote-tally-bar { animation-duration: 620ms; animation-delay: 460ms; }
+.presentation-tally .vote-tally-highlight { animation: vote-leader-reveal 260ms ease-out 980ms backwards; }
+.presentation-tally .vote-tally-row strong { font-size: clamp(18px, 5vw, 26px); }
+@keyframes vote-leader-reveal { from { border-color: var(--line); } to { border-color: var(--gold); } }

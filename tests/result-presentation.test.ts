@@ -1,7 +1,7 @@
 import { morningEvents } from '../src/web/morning-events.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resultFrames } from '../src/web/result-presentation.ts';
+import { latestResultFrames, resultFrames } from '../src/web/result-presentation.ts';
 import { createEndingScenario, soloResponse } from '../src/web/solo-test.ts';
 import type { GameView } from '../src/web/game-api.ts';
 type PublicGame = GameView['public'];
@@ -9,7 +9,7 @@ function snapshot(): PublicGame { return structuredClone(soloResponse(createEndi
 const name = (id:string) => id;
 test('処刑の票数から勝利へ進み、同じ結果や別試合を再生しない',()=>{
  const next=snapshot();const old={...next,phase:'vote' as const,winner:null,publicLog:[]};
- const frames=resultFrames(old,next,name);assert.match(frames[0]!.detail,/\d+票で処刑/);assert.equal(frames.at(-1)?.kind,'victory');assert.equal(frames[0]!.duration,4000);assert.equal(frames[0]!.label,'処刑');assert.equal(frames.at(-1)?.duration,5000);
+ const frames=resultFrames(old,next,name);assert.equal(frames[0]?.kind,'voteTally');assert.deepEqual(frames[0]?.voteTally?.counts,next.voteResult?.counts);assert.match(frames[1]!.detail,/\d+票で処刑/);assert.equal(frames.at(-1)?.kind,'victory');assert.equal(frames[1]!.duration,4000);assert.equal(frames[1]!.label,'処刑');assert.equal(frames.at(-1)?.duration,5000);
  assert.deepEqual(resultFrames(next,next,name),[]);assert.deepEqual(resultFrames({...old,id:'another'},next,name),[]);
 });
 test('夜の直接死亡を先に並べてから後追い・発砲・勝利を表示し重複させない',()=>{
@@ -32,8 +32,7 @@ test('再接続後の既知イベントや過去の夜を次の結果に混ぜ�
  next.phase='discussion';assert.deepEqual(resultFrames(old,next,name),[]);
 });
 
-test('試遊の明示的な再生は最後の夜だけを見せ、過去の処刑を混ぜない',async()=>{
- const { latestResultFrames }=await import('../src/web/result-presentation.ts');
+test('試遊の明示的な再生は最後の夜だけを見せ、過去の処刑を混ぜない',()=>{
  const next=snapshot();next.phase='morning';next.winner=null;next.publicLog=[{id:'e',day:1,kind:'execution',playerId:'old'},{id:'a',day:1,kind:'attack',playerId:'A'},{id:'i',day:1,kind:'injection',playerId:'B'}];
  assert.deepEqual(latestResultFrames(next,name).map(f=>f.id),['dawn','a','i']);
 });
@@ -104,4 +103,26 @@ test('朝の一覧は前夜の直接死亡・発砲・パンを表示し、昼�
  assert.deepEqual(rows.map(row => row.kind), ['injection', 'noVictim', 'shot', 'bread']);
  assert.deepEqual(rows[0]?.followedIds, ['lover']);
  assert.equal(rows[2]?.id, 'night-shot');
+});
+
+test('同票は候補を同時に強調し、決選投票の処刑なしを別の開票として表示する', () => {
+ const base = snapshot();
+ const before = { ...base, phase: 'vote' as const, publicLog: [] };
+ const counts = { A: 2, B: 2, C: 1 };
+ const runoffIds = ['A', 'B'];
+ const runoff: PublicGame = { ...before, phase: 'runoff', runoffIds, voteResult: { counts, runoffIds, executedId: null } };
+ const frames = resultFrames(before, runoff, name);
+ assert.deepEqual(frames.map(frame => frame.kind), ['voteTally', 'notice']);
+ assert.deepEqual(frames[0]?.voteTally, { counts, runoffIds });
+ assert.match(frames[1]!.detail, /Aさん、Bさんが2票/);
+ assert.deepEqual(resultFrames(runoff, runoff, name), []);
+ assert.deepEqual(latestResultFrames(runoff, name), frames);
+ const resolved: PublicGame = { ...runoff, phase: 'execution', runoffIds: [],
+  voteResult: { counts: { A: 2, B: 2 }, runoffIds: [], executedId: null },
+  publicLog: [{ id: 'no-execution', day: 1, kind: 'noExecution' }],
+ };
+ const resolvedFrames = resultFrames(runoff, resolved, name);
+ assert.deepEqual(resolvedFrames.map(frame => frame.kind), ['voteTally', 'notice']);
+ assert.equal(resolvedFrames[0]?.label, '決選投票');
+ assert.match(resolvedFrames[1]!.title, /誰も処刑されません/);
 });

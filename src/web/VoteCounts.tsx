@@ -2,12 +2,12 @@ export default function VoteCounts({ counts, name, runoffIds = [], title = 'å¾—ç
   counts: Record<string, number>;
   name: (id: string) => string;
   runoffIds?: readonly string[];
-  title?: string;
+  title?: string | null;
 }) {
   const rows = Object.entries(counts).sort(([, a], [, b]) => b - a);
   const max = rows[0]?.[1] ?? 0;
   return <section className="vote-tally">
-    <h3>{title}</h3>
+    {title && <h3>{title}</h3>}
     <ul>{rows.map(([id, votes]) => {
       const leading = max > 0 && votes === max;
       const candidate = runoffIds.includes(id);

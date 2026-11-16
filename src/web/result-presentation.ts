@@ -3,7 +3,8 @@ import type { ThiefReveal } from './thief-reveal.ts';
 import type { GameView } from './game-api.ts';
 import { breadNames } from './action-choice.ts';
 import type { BreadType, PublicLogEvent } from '../domain/game.ts';
-export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief' | 'breadVideo' | 'bread'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; breadType?: BreadType; hunterEffect?: 'ready' | 'shot' };
+import { NO_EXECUTION_ID } from '../domain/rules.ts';
+export type ResultFrame = { id: string; kind: 'dusk' | 'dawn' | 'death' | 'notice' | 'victory' | 'thief' | 'breadVideo' | 'bread' | 'voteTally'; title: string; detail: string; duration: number; label?: string; day?: number; team?: 'village' | 'wolves'; exchange?: ThiefReveal; breadType?: BreadType; hunterEffect?: 'ready' | 'shot'; voteTally?: { counts: Record<string, number>; runoffIds: string[] } };
 type PublicGame = GameView['public'];
 function breadFrames(id: string, breadType: BreadType): ResultFrame[] {
   return [
@@ -24,10 +25,28 @@ export function resultFrames(previous: PublicGame, current: PublicGame, name: (i
       ];
     }
   }
-  if (!['execution','morning','hunter','finished'].includes(current.phase)) return [];
+  if (!['runoff','execution','morning','hunter','finished'].includes(current.phase)) return [];
   const seen = new Set((previous.publicLog ?? []).map(e => e.id));
   const events = (current.publicLog ?? []).filter(e => !seen.has(e.id));
   const frames: ResultFrame[] = [];
+  const voteClosed = previous.phase !== current.phase && ['vote', 'runoff'].includes(previous.phase)
+    && (current.phase === 'runoff' || events.some(event => event.kind === 'execution' || event.kind === 'noExecution'));
+  if (voteClosed && current.voteResult) {
+    const runoffIds = current.phase === 'runoff' ? current.runoffIds : [];
+    frames.push({
+      id: 'vote-tally', kind: 'voteTally', title: '開票結果', detail: '', duration: 4500,
+      label: previous.phase === 'runoff' ? '決選投票' : '昼の投票', day: current.day,
+      voteTally: { counts: current.voteResult.counts, runoffIds },
+    });
+    if (runoffIds.length > 0) {
+      const votes = current.voteResult.counts[runoffIds[0]!] ?? 0;
+      const candidates = runoffIds.map(id => id === NO_EXECUTION_ID ? '誰も処刑しない' : `${name(id)}さん`);
+      frames.push({
+        id: 'vote-runoff', kind: 'notice', title: '決選投票へ', detail: `${candidates.join('、')}が${votes}票で並びました。`,
+        duration: 3500, label: '投票結果', day: current.day,
+      });
+    }
+  }
   const night = events.some(e => ['attack','injection','noVictim'].includes(e.kind));
   if (night || current.phase === 'morning' && previous.phase === 'night') frames.push({id:'dawn',kind:'dawn',title:'朝へ',detail:'',duration:1250});
   const deaths = new Set<string>();
@@ -68,6 +87,9 @@ export function latestResultFrames(current: PublicGame, name: (id: string) => st
     return breadFrames('first-night-bread', current.breadDelivery.breadType);
   }
   const events = current.publicLog ?? [];
+  if (current.phase === 'runoff') {
+    return resultFrames({ ...current, phase: 'vote' }, current, name);
+  }
   const direct = ['execution','noExecution','attack','injection','noVictim'];
   let start = events.findLastIndex(e => direct.includes(e.kind));
   const nightKinds = ['attack','injection','noVictim'];
