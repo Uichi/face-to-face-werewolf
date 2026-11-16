@@ -241,7 +241,7 @@ footer small { margin-left: auto; font-size: 12px; }
 .game-timer[data-urgency="soon"] { color: #f4d38a; border-color: #c4a65d; background: #302a1b; }
 .game-timer[data-urgency="urgent"], .game-timer[data-urgency="ended"] { color: var(--danger); border-color: var(--danger-line); background: var(--danger-bg); }
 .current-task { padding: 20px 24px; border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 9px; background: var(--surface-raised); }
-.current-task>span { font-size: 12px; letter-spacing: .12em; color: var(--gold); }
+.current-task span { font-size: 12px; letter-spacing: .12em; color: var(--gold); }
 .current-task h2 { font-size: 21px; margin: 7px 0; font-weight: 500; }
 .game-screen .current-task p { margin: 0; font-size: 14px; color: var(--muted); }
 .task-waiting { background: var(--surface-inset); border-left-color: #8e9b8a; }
@@ -989,3 +989,6 @@ button:enabled:active {
 .lobby-shortcuts a { display: inline-flex; align-items: center; min-height: 44px; }
 #room-invite, #room-settings { scroll-margin-top: 20px; }
 #room-invite .qr-wrap { margin-top: 18px; }
+
+.current-task.task-error { border-inline-start-color: var(--danger); }
+.current-task .task-recovery { margin-top: 12px; width: 100%; }

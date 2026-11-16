@@ -51,6 +51,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const [game, setGame] = useState<GameView | null>(localDriver?.response.game ?? null);
  const [error, setError] = useState('');
  const [offline, setOffline] = useState(false);
+ const [checking, setChecking] = useState(false);
  const [busy, setBusy] = useState(false);
  const [sendingTarget, setSendingTarget] = useState<string | null>(null);
  const [revealed, setRevealed] = useState(false);
@@ -95,16 +96,25 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
    const conceal = () => { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); };
    const visible = () => { if (document.visibilityState !== 'visible') conceal(); else void refresh(); };
    const blur = conceal;
+   const disconnected = () => { if (!localDriver) setOffline(true); };
+   window.addEventListener('offline', disconnected);
    document.addEventListener('visibilitychange', visible); window.addEventListener('blur', blur); window.addEventListener('online', visible);
-   return () => { active.current = false; clearInterval(tick); if (poll) clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); };
+   return () => { active.current = false; clearInterval(tick); if (poll) clearInterval(poll); stop(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('blur', blur); window.removeEventListener('online', visible); window.removeEventListener('offline', disconnected); };
  }, [refresh, room.id, localDriver]);
  useEffect(() => { if (localDriver) apply(localDriver.response); }, [localDriver?.response, apply, localDriver]);
  useEffect(() => { setRevealed(false); setFlipping(false); setThiefMotion(false); setEnduranceGlow(false); setDialog(null); setPending(null); setError(''); if (game?.public.phase !== 'finished') window.scrollTo({ top: 0, behavior: 'instant' }); }, [game?.public.id, game?.public.phaseId]);
  useEffect(() => { if (helpOpen) { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); } }, [helpOpen]);
  useEffect(() => { if (!revealed) return; const timer=setTimeout(() => { setRevealed(false); setDialog(value => value?.action === 'confirm' ? null : value); }, 20_000); return () => clearTimeout(timer); }, [revealed]);
 
+ async function checkConnection() {
+   if (polling.current || sending.current) return;
+   setChecking(true);
+   try { await refresh(); }
+   finally { if (active.current) setChecking(false); }
+ }
+
  async function send(action: string, extra: Record<string, unknown> = {}, retry?: Pending) {
-   if (sending.current || !gameRef.current) return;
+   if (sending.current || offline || !gameRef.current) return;
    const current = gameRef.current;
    const command = retry ?? { action, payload: { roomId: room.id, gameId: current.public.id, phaseId: current.public.phaseId, requestId: requestId(), ...extra } };
    sending.current = true; setBusy(true); setError(''); setDialog(null);
@@ -116,7 +126,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
      if (active.current) { const strength=gameRef.current?.private?.attackStrength; setWolfStrength(strength===1||strength===2||strength===3?strength:2); setError((e as Error).message); setPending(e instanceof GameError && e.retryable ? command : null); }
    } finally { sending.current = false; if (active.current) { setBusy(false); setSendingTarget(null); } if (!localDriver) void refresh(); }
  }
- if (!game) return <section className="panel game-loading"><h1>試合に接続しています</h1><p role="status">{error || '少しお待ちください。'}</p><button className="primary" onClick={() => void refresh()}>再接続</button></section>;
+ if (!game) return <section className="panel game-loading"><h1>試合に接続しています</h1><p role="status">{error || '少しお待ちください。'}</p><button className="primary" disabled={checking} onClick={() => void checkConnection()}>{checking ? '確認中…' : '接続を確認'}</button></section>;
  const pub=game.public, priv=game.private;
  const self=pub.players.find(p=>p.id===me)!;
  const host=pub.hostId===me;
@@ -138,7 +148,7 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
  const noExecutionWon = !pub.voteResult?.executedId && voteCounts?.[NO_EXECUTION_ID] === highestVotes
    && Object.values(voteCounts ?? {}).filter(count => count === highestVotes).length === 1;
  const directlyEliminatedId = pub.voteResult?.executedId;
- const task=currentTask({resultConfirmation:pub.resultConfirmation===true,phase,alive:self.alive,confirmed:!!priv?.confirmed,selected:!!priv?.selection,roleSeen,busy,retryPending:!!pending,offline,hunterActor:hunterShot});
+ const task=currentTask({resultConfirmation:pub.resultConfirmation===true,phase,alive:self.alive,confirmed:!!priv?.confirmed,selected:!!priv?.selection,roleSeen,busy,retryPending:!!pending,offline,error,host,hunterActor:hunterShot});
  const ability=role && ['wolf','seer','knight','doctor'].includes(role);
  const breadChoice=!!(room.breadChoices||localDriver)&&role==='baker'&&(phase==='firstNight'||phase==='night');
  const thiefChoice=phase==='roles'&&role==='thief';
@@ -195,12 +205,19 @@ export default function GameScreen({ room, onRoom, onHome, helpOpen = false, loc
 
  return <ResultPresentation game={pub} room={room} paused={offline || helpOpen} allowReplay={!!localDriver}><div className={`game-screen ${phase==='night'||phase==='firstNight'?'night-screen':''}`}>
    <div className="game-top" data-phase-tone={phaseTone} key={phase}><div><div className="section-number">{pub.day}日目 · {alive.length}人生存</div><h1><span>{phaseNames[phase]}</span></h1></div>{seconds!==null&&<div className="game-timer" data-urgency={seconds===0?'ended':seconds!==null&&seconds<=10?'urgent':seconds!==null&&seconds<=30?'soon':'normal'} role="timer" aria-label={`残り${seconds}秒`}><strong>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</strong><small>{seconds===0?'操作を待っています':'残り時間'}</small></div>}</div>
-   {phase!=='finished'&&<aside className={`current-task ${task.waiting?'task-waiting':''}`} aria-live="polite" aria-atomic="true"><span>今やること</span><h2>{task.title}</h2><p>{task.detail}</p></aside>}
-   {offline&&<div className="message" role="status">接続を確認しています。操作の結果を確認できるまで、このままお待ちください。</div>}
-   {error&&<div className="message error" role="alert">{error}{pending&&<button className="text-button" disabled={busy} onClick={()=>void send(pending.action,{},pending)}>同じ操作を再送する</button>}</div>}
+   {(phase !== 'finished' || offline || busy || pending || error) &&
+     <aside className={`current-task ${task.waiting ? 'task-waiting' : ''} ${error && !busy && !offline && !pending ? 'task-error' : ''}`}>
+       <div role={error && !busy && !offline && !pending ? 'alert' : 'status'} aria-atomic="true">
+         <span>今やること</span><h2>{task.title}</h2><p>{task.detail}</p>
+       </div>
+       {offline && <button className="secondary-button task-recovery" disabled={checking || busy}
+         onClick={() => void checkConnection()}>{checking ? '確認中…' : '接続を確認'}</button>}
+       {pending && !offline && !busy && <button className="secondary-button task-recovery"
+         onClick={() => void send(pending.action, {}, pending)}>同じ操作を再送する</button>}
+     </aside>}
    {phase!=='finished'&&pub.removals.length>0&&<div className="inline-note">途中脱落：{pub.removals.map(r=>`${name(r.playerId)}さん（${r.day}日目）`).join('、')}</div>}
    {!self.alive&&!hunterShot&&phase!=='finished'&&<div className="spectator-note">あなたは脱落しました。発言・投票・能力使用はせず、静かに見守ってください。</div>}
-   {phase==='finished'?<GameResult game={pub} room={room} personalNotice={game.personalNotice}>{game.personalNotice?.kind==='endurance'&&<p className="inline-note" role="status">あなただけへの通知：{game.personalNotice.day}日目の夜、筋肉で襲撃に耐えました。襲撃への耐久は使用済みです。</p>}{host?<button className="primary" disabled={busy} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じ設定で再戦（待機室へ）</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
+   {phase==='finished'?<GameResult game={pub} room={room} personalNotice={game.personalNotice}>{game.personalNotice?.kind==='endurance'&&<p className="inline-note" role="status">あなただけへの通知：{game.personalNotice.day}日目の夜、筋肉で襲撃に耐えました。襲撃への耐久は使用済みです。</p>}{host?<button className="primary" disabled={controlsDisabled} onClick={()=>setDialog({text:'同じメンバー・設定で待機室に戻ります。前の試合の役職や行動は引き継ぎません。',action:'rematch'})}>同じ設定で再戦（待機室へ）</button>:<p className="muted">主催者が再戦を選ぶと、待機室に戻ります。</p>}<div className="result-exit"><button className="secondary-button" disabled={busy} onClick={onHome}>トップへ戻る</button><p>新しい部屋をつくる・別の部屋に参加する</p></div></GameResult>:<>
      {priv&&<section className="panel private-panel"><div className="panel-heading"><h2>あなただけの情報</h2><button className="text-button" aria-expanded={revealed} onClick={openPrivate}>{revealed?'隠す':'タップして表示'}</button></div>{!revealed?<><p className="muted">周りに画面を見せないように確認してください。</p>{priv.endurance?.used&&phase==='morning'&&priv.endurance.day===pub.day-1&&<p role="status">新しいお知らせがあります。「タップして表示」で確認してください。</p>}</>:<div className="secret-content">
        {priv.blessingReceived && <div className="secret-box">
          <strong role="status">獅子舞から福を授かりました。</strong>
