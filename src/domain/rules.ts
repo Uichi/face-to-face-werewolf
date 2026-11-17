@@ -55,8 +55,9 @@ export function assignRoles(ids: readonly string[], composition: Composition, ra
     pool.splice(pool.indexOf(role), 1);
     return { id, role, initialRole: role, apparentRole: role, alive: true };
   });
+  const disguises = FOOL_DISGUISES.filter(role => (composition[role] ?? 0) > 0);
   for (const player of players) if (player.role === 'fool') {
-    player.apparentRole = pick(FOOL_DISGUISES, random);
+    player.apparentRole = disguises.length > 0 ? pick(disguises, random) : 'villager';
     player.decoy = true;
   }
   return players;

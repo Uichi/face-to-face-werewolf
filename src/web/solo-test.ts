@@ -26,10 +26,11 @@ export function createSoloSession(role: Role = 'villager', count = 5): SoloSessi
   const game = createGame({ id: `solo-game-${Date.now()}`, hostId: SOLO_VIEWER, playerIds: ids, composition, discussionMinutes: 1 }, Date.now(), () => 0);
   const chosen = game.players.find(player => player.role === role)!;
   const mine = game.players.find(player => player.id === SOLO_VIEWER)!;
+  const foolDisguise = chosen.apparentRole;
   [chosen.role, mine.role] = [mine.role, chosen.role];
   for (const player of [chosen, mine]) {
     player.initialRole = player.role;
-    player.apparentRole = player.role === 'fool' ? FOOL_DISGUISES[0] : player.role;
+    player.apparentRole = player.role === 'fool' ? foolDisguise : player.role;
     player.decoy = player.role === 'fool';
   }
   const room: Room = {

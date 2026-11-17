@@ -30,6 +30,13 @@ test('初夜SQL: パンなしで最後の確認後も応答が空にならず、
    await db.exec(`create or replace function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(repeat('00',n),'hex')$$`);
   }
  });
+ await t.test('偽装候補は配られた村側能力職に限り、空なら村人になる', async () => {
+  for (const [composition, expected] of [[{ wolf: 1, fool: 2 }, 'villager'], [{ doctor: 2, fool: 1 }, 'doctor'], [{ baker: 1, fool: 2 }, 'baker']] as const) {
+   const { role } = (await db.query<{role:string}>('select app_private.fool_disguise($1::jsonb) role', [JSON.stringify(composition)])).rows[0]!;
+   assert.equal(role, expected);
+  }
+  await db.exec(await readFile(new URL('202611170037_fool_disguise_pool.sql',dir),'utf8'));
+ });
  const users=Array.from({length:13},()=>randomUUID());for(const id of users)await db.query('insert into auth.users values($1)',[id]);
  const user=async(i:number)=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[users[i]!]);await db.exec('set role authenticated');};
  const raw=async(fn:string,action:string,payload:object)=>(await db.query<{r:any}>(`select public.${fn}($1,$2::jsonb) r`,[action,JSON.stringify(payload)])).rows[0]!.r;

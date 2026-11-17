@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FOOL_DISGUISES, NO_EXECUTION_ID, validateComposition } from '../src/domain/rules.ts';
+import { assignRoles, FOOL_DISGUISES, NO_EXECUTION_ID, validateComposition } from '../src/domain/rules.ts';
 import { randomCombinations } from '../src/domain/random-composition.ts';
 import { viewFor } from '../src/domain/game.ts';
 import { applySoloAction, completeSoloPhase, createFoolScenario, createRobbedScenario, SOLO_VIEWER } from '../src/web/solo-test.ts';
@@ -13,6 +13,18 @@ test('5〜13人でバカ0〜3人を抽選でき、4人は配役できない', ()
   }
   const { room } = createFoolScenario('seer');
   assert.throws(() => validateComposition(10, { ...room.composition!, villager: room.composition!.villager - 1, fool: 4 }), /0〜3人/);
+});
+
+test('配られた対象役職からバカごとに抽選し、候補がなければ村人を表示する', () => {
+  const ids = ['A', 'B', 'C', 'D', 'E'];
+  const base = { villager: 0, wolf: 1, fool: 2, seer: 1, medium: 0, knight: 1, madman: 0, lover: 0, baker: 0 };
+  let calls = 0;
+  const two = assignRoles(ids, base, () => Math.max(0, calls++ - ids.length));
+  assert.deepEqual(two.filter(player => player.role === 'fool').map(player => player.apparentRole), ['seer', 'knight']);
+  const one = assignRoles(ids, { ...base, seer: 0, villager: 1 }, () => 0);
+  assert.deepEqual(one.filter(player => player.role === 'fool').map(player => player.apparentRole), ['knight', 'knight']);
+  const none = assignRoles(ids, { ...base, seer: 0, knight: 0, villager: 2 }, () => 0);
+  assert.deepEqual(none.filter(player => player.role === 'fool').map(player => player.apparentRole), ['villager', 'villager']);
 });
 
 test('三人の偽装は本人だけに表示され、六種類の操作は実際の能力を発動しない', () => {
