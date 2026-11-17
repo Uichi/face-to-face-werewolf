@@ -1137,3 +1137,21 @@ button:enabled:active {
 .game-screen.spectating .game-timer strong { color: #edf4f5; }
 
 .result-role-label .role-art { width: 40px; margin: 0 0 4px; }
+
+.fool-review-group {
+  margin-block: 12px;
+  padding: clamp(12px, 4vw, 20px);
+  border: 1px solid var(--line-gold);
+  border-radius: 12px;
+  background: var(--surface-inset);
+  overflow-wrap: anywhere;
+}
+.fool-review-group h4 { margin: 0 0 14px; color: var(--gold-bright); }
+.fool-review-layout { display: grid; grid-template-columns: clamp(48px, 16vw, 96px) minmax(0, 1fr); align-items: start; gap: 14px; }
+.fool-review-layout .role-art { margin: 0; }
+.fool-review-layout ul { list-style: none; margin: 0; padding: 0; }
+.fool-review-layout li { padding: 8px 0; border-top: 1px solid var(--line); }
+.fool-review-layout span { display: block; color: var(--muted); }
+.fool-review-genuine { margin: 0 0 10px; }
+.fool-review-genuine strong { color: var(--gold-bright); }
+.fool-transfer { border-inline-start: 3px solid var(--gold); padding-inline-start: 12px; overflow-wrap: anywhere; }

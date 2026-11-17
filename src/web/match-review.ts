@@ -1,3 +1,4 @@
+import type { GameView } from './game-api.ts';
 import type { PublicLogEvent } from '../domain/game.ts';
 import type { Score } from '../domain/scoring.ts';
 import type { Role } from '../domain/rules.ts';
@@ -23,4 +24,14 @@ export function explainScore(score: Score, role: Role | undefined, won: boolean 
     if(role==='hunter')conditions.push('発砲で本物の人狼を倒す。');
   }
   return {victory,survival,contribution,conditions};
+}
+
+export function foolReviewGroups(game: GameView['public']) {
+  if (game.phase !== 'finished') return [];
+  const disguises = new Set(game.players.flatMap(player => player.foolDisguise ? [player.foolDisguise] : []));
+  return [...disguises].map(disguise => ({
+    disguise,
+    genuine: game.players.filter(player => player.role === disguise),
+    disguised: game.players.filter(player => player.foolDisguise === disguise),
+  }));
 }

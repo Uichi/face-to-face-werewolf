@@ -2,7 +2,7 @@ import VoteCounts from './VoteCounts.tsx';
 import ThiefExchangeCards from './ThiefExchangeCards.tsx';
 import { publicThiefReveal } from './thief-reveal.ts';
 import { rankedMembers } from './scoreboard.ts';
-import { explainScore } from './match-review.ts';
+import { explainScore, foolReviewGroups } from './match-review.ts';
 import RoleImage from './RoleImage.tsx';
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
@@ -43,6 +43,8 @@ export default function GameResult({ game, room, personalNotice, children }: { g
   const leaders=standings.filter(member=>member.rank===1);
   const explanations=Object.fromEntries((game.scores??[]).map(score=>{const player=game.players.find(p=>p.id===score.playerId);return [score.playerId,explainScore(score,player?.role,player?.role?winners.some(p=>p.id===player.id):undefined)];}));
   const exchange = publicThiefReveal(game);
+  const foolGroups = foolReviewGroups(game);
+  const foolExchange = exchange?.stolenRole === 'fool' ? exchange : null;
   const ending = game.ending;
   const failedAttacks = game.phase === 'finished' ? game.failedAttacks ?? [] : [];
   const lastPlayer = ending && game.players.find(p => p.id === ending.playerId);
@@ -99,6 +101,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       {game.voteResult && <a href="#match-review-votes">直近の得票</a>}
       <a href="#match-review-timeline">公開ログ</a>
       {failedAttacks.length > 0 && <a href="#match-review-attacks">襲撃が失敗した理由</a>}
+      {foolGroups.length > 0 && <a href="#match-review-fools">バカの答え合わせ</a>}
       <a href="#match-review-roles">最終役職</a>
       {drawnRoles.length > 0 && <a href="#match-review-draw">開始時の抽選配役</a>}
       {game.scores && <a href="#match-review-scores">順位・得点</a>}
@@ -122,6 +125,29 @@ export default function GameResult({ game, room, personalNotice, children }: { g
         </li>)}
       </ol>
     </section>}
+    {foolGroups.length > 0 && <section id="match-review-fools" className="fool-review" aria-labelledby="fool-review-title">
+      <h3 id="fool-review-title">バカの答え合わせ</h3>
+      {foolExchange && <p className="fool-transfer">
+        <strong>{name(foolExchange.targetId)}さん</strong>の「バカ」が怪盗の<strong>{name(foolExchange.thiefId)}さん</strong>へ移りました。
+        {name(foolExchange.targetId)}さんは村人になり、2人には同じ偽装役職が表示されていました。
+      </p>}
+      {foolGroups.map(({ disguise, genuine, disguised }) => <article className="fool-review-group" key={disguise}>
+        <h4>{roleNames[disguise]}のカードが見えていた人</h4>
+        <div className="fool-review-layout">
+          <RoleImage role={disguise} compact />
+          <div>
+            <p className="fool-review-genuine"><strong>本物の{roleNames[disguise]}</strong>
+              <span>{genuine.length ? genuine.map(player => name(player.id)).join('、') : 'この試合にはいませんでした'}</span>
+            </p>
+            <ul>{disguised.map(player => <li key={player.id}>
+              <strong>{name(player.id)}{player.id === room.viewerId ? '（あなた）' : ''}</strong>
+              <span>{player.initialRole !== player.role && player.initialRole && <>{roleNames[player.initialRole]} → </>}
+                {player.role && roleNames[player.role]}</span>
+            </li>)}</ul>
+          </div>
+        </div>
+      </article>)}
+    </section>}
     <div className="result-roles" id="match-review-roles">
       <h3>全員の最終役職</h3>
       {game.players.map(p => {
@@ -134,7 +160,7 @@ export default function GameResult({ game, room, personalNotice, children }: { g
       })}
     </div>
     {game.phase === 'finished' && game.players.some(player => player.wolfbound || player.initialWolfbound) && <section className="wolfbound-reveal"><h3>狼憑きの正体</h3><RoleImage role="wolfbound" compact/><p>{game.players.filter(player => player.wolfbound).map(player => `${name(player.id)}さん`).join('、')}が狼憑きでした。</p>{game.players.filter(player => player.initialWolfbound && !player.wolfbound).map(player => <p key={player.id}>{name(player.id)}さんの狼憑き状態は、怪盗へ移りました。</p>)}</section>}
-    {exchange&&<section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
+    {exchange && (!foolExchange || !foolGroups.length) && <section className="thief-final-reveal"><h3>怪盗の答え合わせ</h3><ThiefExchangeCards thiefName={name(exchange.thiefId)+'さん'} targetName={name(exchange.targetId)+'さん'} stolenRole={exchange.stolenRole}/></section>}
     <div className="winning-members"><h3>勝ったメンバー</h3><p>勝利陣営のメンバーは、脱落していても勝利です。</p><ul>{winners.map(p => <li key={p.id}>{name(p.id)}{p.id === room.viewerId ? '（あなた）' : ''}{p.id === shishimaiWinner ? ' · 獅子舞の追加勝利' : ''}</li>)}</ul></div>
     {drawnRoles.length > 0 && <section id="match-review-draw" aria-labelledby="drawn-roles-title">
       <h3 id="drawn-roles-title">抽選で決まった開始時の配役</h3>

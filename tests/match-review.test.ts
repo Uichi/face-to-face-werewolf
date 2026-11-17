@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewDays, explainScore } from '../src/web/match-review.ts';
-import { createSoloSession, soloResponse } from '../src/web/solo-test.ts';
+import { reviewDays, explainScore, foolReviewGroups } from '../src/web/match-review.ts';
+import { createFoolScenario, createRobbedScenario, createSoloSession, soloResponse } from '../src/web/solo-test.ts';
 import type { PublicLogEvent } from '../src/domain/game.ts';
 
 test('振り返りは日付順、同日の公開イベント順を保ち、重複を省く',()=>{
@@ -29,4 +29,25 @@ test('一人試遊の確定得点は累計に一度だけ表示し、試合中�
  session.game.phase='finished';session.room.members[0]!.points=10;
  assert.equal(soloResponse(session).room.members[0]!.points,17);assert.equal(soloResponse(session).room.members[0]!.points,17);
  assert.equal(session.room.members[0]!.points,10);
+});
+
+test('バカの答え合わせは終了後だけ、本物と同じカードを見た三人をまとめる', () => {
+ const game = soloResponse(createFoolScenario('seer')).game!.public;
+ assert.deepEqual(foolReviewGroups(game), []);
+ const session = createFoolScenario('seer');
+ session.game.phase = 'finished';
+ const groups = foolReviewGroups(soloResponse(session).game!.public);
+ assert.equal(groups.length, 1);
+ assert.equal(groups[0]!.disguise, 'seer');
+ assert.equal(groups[0]!.genuine.length, 1);
+ assert.equal(groups[0]!.disguised.length, 3);
+ assert.ok(groups[0]!.disguised.every(player => player.role === 'fool'));
+});
+
+test('怪盗が奪った場合、同じ偽装を見た二人と役職の変化が残る', () => {
+ const session = createRobbedScenario('fool');
+ session.game.phase = 'finished';
+ const [group] = foolReviewGroups(soloResponse(session).game!.public);
+ assert.deepEqual(group!.disguised.map(player => [player.initialRole, player.role]).sort(),
+  [['fool', 'villager'], ['thief', 'fool']]);
 });
